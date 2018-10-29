@@ -9,7 +9,7 @@
 #include <ESP8266mDNS.h>
 #include <vector>
 
-const char* ssid = "bodhi";
+const char* ssid = "Bodhi";
 const char* password = "wtaguest";
 
 ESP8266WebServer server(80);
@@ -107,13 +107,10 @@ void InitiallyBlinkingLED::step() {
     }
 }
 
-void handleRoot() {
-    digitalWrite(LED_BUILTIN, LOW);
-    server.send(200, "text/plain", "hello from esp8266!");
-}
 
 void setupWifi() {
     WiFi.begin(ssid, password);
+    Serial.print("Connecting:");
     // Wait for connection
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
@@ -124,12 +121,6 @@ void setupWifi() {
     Serial.println(ssid);
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
-}
-
-void setupServer() {
-    server.on("/", handleRoot);
-    server.begin();
-    Serial.println("HTTP server started");
 }
 
 void setColor(int *led, const bool* color) {
@@ -165,25 +156,26 @@ void setup() {
     for (int i = 0; i < 3; i++) {
         pinMode(rgbLED[i], OUTPUT);
     }
+    analogWriteRange(255);
 
-
+    setColor(rgbLED, OFF);
     digitalWrite(LED_BUILTIN, HIGH);
-//    Serial.begin(115200);
-//    Serial.print("Connecting:");
 
-//    setupWifi();
+    Serial.begin(115200);
+
+    setupWifi();
 //    setupServer();
 
     digitalWrite(LED_BUILTIN, LOW);
 
-    analogWriteRange(255);
+
 }
 
 // the loop function runs over and over again forever
 void loop() {
-    auto fastBlink = InitiallyBlinkingLED(RED, 5, 1, 1);
-    auto medBlink = InitiallyBlinkingLED(GREEN, 5, 2, 1);
-    auto slowBlink = InitiallyBlinkingLED(BLUE, 5, 4, 1);
+    auto fastBlink = InitiallyBlinkingLED(RED, 15, 1, 1);
+    auto noBlink = LED(GREEN);
+    auto slowBlink = BlinkingLED(BLUE, 4, 1);
 
     for (int i = 0; i < 50; i++) {
         setColor(rgbLED, fastBlink.getColor());
@@ -192,8 +184,8 @@ void loop() {
     }
 
     for (int i = 0; i < 50; i++) {
-        setColor(rgbLED, medBlink.getColor());
-        medBlink.step();
+        setColor(rgbLED, noBlink.getColor());
+        noBlink.step();
         delay(200);
     }
 
