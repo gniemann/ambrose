@@ -8,104 +8,15 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <vector>
+#include "color.h"
+#include "led.h"
 
 const char* ssid = "Bodhi";
 const char* password = "wtaguest";
 
-ESP8266WebServer server(80);
-
-int rgbLED[] = {D5, D6, D7};
-
-class Color {
-public:
-    int red;
-    int green;
-    int blue;
-
-    Color(int r, int g, int b) : red(r), green(g), blue(b) {}
-};
-
-const Color RED = Color(255, 0, 0);
-const Color GREEN = Color(0, 255, 0);
-const Color BLUE = Color(0, 0, 255);
-const Color YELLOW = Color(255, 255, 0);
-const Color CYAN = Color(0, 255, 255);
-const Color MAGENTA = Color(255, 0, 255);
-const Color SILVER = Color(192, 192, 192);
-const Color GRAY = Color(128, 128, 128);
-const Color MAROON = Color(128, 0, 0);
-const Color OLIVE = Color(128, 128, 0);
-const Color PURPLE = Color(128, 0, 128);
-const Color TEAL = Color(0, 128, 128);
-const Color NAVY = Color(0, 0, 128);
-const Color WHITE = Color(255, 255, 255);
-const Color OFF = Color(0, 0, 0);
-
-const std::vector<Color> COLORS = {RED, GREEN, BLUE, YELLOW, CYAN, MAGENTA, SILVER, GRAY, MAROON, OLIVE, PURPLE, TEAL, NAVY, WHITE};
-
-class LED {
-public:
-    LED(const Color &c) : color(c), on(true) {}
-    void turnOn() { on = true; }
-    void turnOff() { on = false; }
-    bool isOn() const { return on; }
-
-    Color getColor() const { return on ? color : OFF; }
-
-    virtual void step() {}
-private:
-    Color color;
-    bool on;
-};
-
-class BlinkingLED: public LED {
-public:
-    BlinkingLED(const Color &c, int onPeriod, int offPeriod): LED(c), onInterval(onPeriod), offInterval(offPeriod), intervalCounter(0) {}
-    void step();
-private:
-    void toggle();
-
-    int onInterval;
-    int offInterval;
-    int intervalCounter;
-};
-
-void BlinkingLED::step() {
-    if (++intervalCounter >= (isOn() ? onInterval : offInterval)) {
-        toggle();
-    }
-}
-
-void BlinkingLED::toggle() {
-    if (isOn()) {
-        turnOff();
-    } else {
-        turnOn();
-    }
-    intervalCounter = 0;
-}
-
-class InitiallyBlinkingLED: public BlinkingLED {
-public:
-    InitiallyBlinkingLED(const Color &c, int times, int onPeriod, int offPeriod): BlinkingLED(c, onPeriod, offPeriod), blinkTimes(times), isBlinking(true), currentTime(0) { }
-
-    void step();
-
-private:
-    int blinkTimes;
-    bool isBlinking;
-    int currentTime;
-};
-
-void InitiallyBlinkingLED::step() {
-    if (isBlinking) {
-        auto wasOn = isOn();
-        BlinkingLED::step();
-        if (!wasOn && isOn() && ++currentTime >= blinkTimes) {
-            isBlinking = false;
-        }
-    }
-}
+const int DATA = D5;
+const int CLOCK = D6;
+const int LATCH = D7;
 
 
 void setupWifi() {
@@ -123,77 +34,86 @@ void setupWifi() {
     Serial.println(WiFi.localIP());
 }
 
-void setColor(int *led, const bool* color) {
-    for (int i = 0; i < 3; i++) {
-        digitalWrite(led[i], color[i]);
-    }
-}
-
-void setColor(int *led, const Color &color) {
-    analogWrite(led[0], 255 - color.red);
-    analogWrite(led[1], 255 - color.green);
-    analogWrite(led[2], 255 - color.blue);
-}
-
-Color randomColor() {
-    return COLORS[random(0, COLORS.size())];
-}
-
-void blink(int *led, const Color &color, int times, int onTime, int offTime) {
-
-    for (int i = 0; i < times; i++) {
-        setColor(led, color);
-        delay(onTime);
-        setColor(led, OFF);
-        delay(offTime);
-    }
-}
-
 // the setup function runs once when you press reset or power the board
 void setup() {
     // initialize digital pin LED_BUILTIN as an output.
     pinMode(LED_BUILTIN, OUTPUT);
-    for (int i = 0; i < 3; i++) {
-        pinMode(rgbLED[i], OUTPUT);
-    }
-    analogWriteRange(255);
+    pinMode(DATA, OUTPUT);
+    pinMode(CLOCK, OUTPUT);
+    pinMode(LATCH, OUTPUT);
 
-    setColor(rgbLED, OFF);
+    digitalWrite(LATCH, LOW);
+    shiftOut(DATA, CLOCK, MSBFIRST, 0xFF);
+    digitalWrite(LATCH, HIGH);
+
     digitalWrite(LED_BUILTIN, HIGH);
 
     Serial.begin(115200);
 
-    setupWifi();
-//    setupServer();
+//    setupWifi();
 
     digitalWrite(LED_BUILTIN, LOW);
-
-
 }
+
+uint8_t colorToByte(const Color &c) {
+    uint8_t output = 0;
+
+    if (c.blue == 0) {
+        output++;
+    }
+    output = output<<1;
+    if (c.green == 0) {
+        output++;
+    }
+    output = output<<1;
+    if (c.red == 0) {
+        output = output + 1;
+    }
+
+    return output;
+}
+
+using LEDPtr = std::shared_ptr<LED>;
 
 // the loop function runs over and over again forever
 void loop() {
-    auto fastBlink = InitiallyBlinkingLED(RED, 15, 1, 1);
-    auto noBlink = LED(GREEN);
-    auto slowBlink = BlinkingLED(BLUE, 4, 1);
+    std::vector<LEDPtr> lightOneStates {
+        LEDPtr(new InitiallyBlinkingLED(RED, 15, 1, 1)),
+        LEDPtr(new LED(GREEN)),
+        LEDPtr(new BlinkingLED(BLUE, 4, 1))
+    };
 
-    for (int i = 0; i < 50; i++) {
-        setColor(rgbLED, fastBlink.getColor());
-        fastBlink.step();
-        delay(200);
+    std::vector<LEDPtr> lightTwoStates {
+        LEDPtr(new BlinkingLED(GREEN, 2, 2)),
+        LEDPtr(new InitiallyBlinkingLED(BLUE, 20, 2, 1)),
+        LEDPtr(new BlinkingLED(RED, 3, 1))
+    };
+
+    auto lightOneIt = lightOneStates.begin();
+    auto lightTwoIt = lightTwoStates.begin();
+
+    while (lightOneIt != lightOneStates.end() && lightTwoIt != lightOneStates.end()) {
+        auto light1 = *lightOneIt;
+        auto light2 = *lightTwoIt;
+        for (int i = 0; i < 50; i++) {
+            auto c1 = light1->getColor();
+            uint8_t output = colorToByte(c1);
+
+            output = output<<3;
+            auto c2 = light2->getColor();
+            output += colorToByte(c2);
+
+            digitalWrite(LATCH, LOW);
+            shiftOut(DATA, CLOCK, MSBFIRST, output);
+            digitalWrite(LATCH, HIGH);
+
+            light1->step();
+            light2->step();
+            delay(200);
+        }
+
+        ++lightOneIt;
+        ++lightTwoIt;
     }
 
-    for (int i = 0; i < 50; i++) {
-        setColor(rgbLED, noBlink.getColor());
-        noBlink.step();
-        delay(200);
-    }
-
-    for (int i = 0; i < 50; ++i) {
-        setColor(rgbLED, slowBlink.getColor());
-        slowBlink.step();
-        delay(200);
-    }
-
-//    server.handleClient();
 }
