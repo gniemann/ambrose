@@ -14,10 +14,17 @@
 const char* ssid = "Bodhi";
 const char* password = "wtaguest";
 
-const int DATA = D5;
-const int CLOCK = D6;
-const int LATCH = D7;
+using Pin = uint8_t;
+using Hz = int;
+using LEDPtr = std::shared_ptr<LED>;
 
+const Pin DATA = D5;
+const Pin CLOCK = D6;
+const Pin LATCH = D7;
+
+const Hz RATE = 5;
+
+std::vector<LEDPtr> lights;
 
 void setupWifi() {
     WiFi.begin(ssid, password);
@@ -34,6 +41,61 @@ void setupWifi() {
     Serial.println(WiFi.localIP());
 }
 
+uint8_t colorToByte(const Color &c) {
+    uint8_t output = 0;
+
+    if (c.blue != 0) {
+        output++;
+    }
+    output = output<<1;
+    if (c.green != 0) {
+        output++;
+    }
+    output = output<<1;
+    if (c.red != 0) {
+        output++;
+    }
+
+    return output;
+}
+
+// this function converts up to 21 RGB LEDs into a 64-bit integer value
+//template<template<class ...> class Container, class ... Args>
+//uint64_t convertColors(const Container<LEDPtr, Args...> &leds) {
+//    uint64_t output = 0;
+//    for (auto&& light : leds) {
+//        output+=colorToByte(light->getColor());
+//        output = output<<3;
+//    }
+//
+//    return output;
+//}
+
+uint64_t convertColors(const std::vector<LEDPtr> &leds) {
+    if (leds.empty()) {
+        return 0;
+    }
+
+    auto it = leds.begin();
+    uint64_t output = colorToByte((*it)->getColor());
+    while (++it != leds.end()) {
+        output = (output<<3) + colorToByte((*it)->getColor());
+    }
+
+    return output;
+}
+
+void shiftOut(uint64_t output) {
+    digitalWrite(LATCH, LOW);
+
+    for (int i = sizeof(uint64_t); i >= 0; i-=8) {
+        uint8_t shift = (output >> i) & 0xFF;
+        shiftOut(DATA, CLOCK, MSBFIRST, ~shift);
+    }
+
+    digitalWrite(LATCH, HIGH);
+}
+
 // the setup function runs once when you press reset or power the board
 void setup() {
     // initialize digital pin LED_BUILTIN as an output.
@@ -42,9 +104,15 @@ void setup() {
     pinMode(CLOCK, OUTPUT);
     pinMode(LATCH, OUTPUT);
 
-    digitalWrite(LATCH, LOW);
-    shiftOut(DATA, CLOCK, MSBFIRST, 0xFF);
-    digitalWrite(LATCH, HIGH);
+    // turn all LEDs off
+    shiftOut(UINT64_MAX);
+
+    // set up lights
+    lights.push_back(std::make_shared<LED>(RED));
+    lights.push_back(std::make_shared<LED>(GREEN));
+    lights.push_back(std::make_shared<LED>(BLUE));
+//    auto output = convertColors(lights);
+//    shiftOut(output);
 
     digitalWrite(LED_BUILTIN, HIGH);
 
@@ -54,26 +122,6 @@ void setup() {
 
     digitalWrite(LED_BUILTIN, LOW);
 }
-
-uint8_t colorToByte(const Color &c) {
-    uint8_t output = 0;
-
-    if (c.blue == 0) {
-        output++;
-    }
-    output = output<<1;
-    if (c.green == 0) {
-        output++;
-    }
-    output = output<<1;
-    if (c.red == 0) {
-        output = output + 1;
-    }
-
-    return output;
-}
-
-using LEDPtr = std::shared_ptr<LED>;
 
 // the loop function runs over and over again forever
 void loop() {
@@ -89,31 +137,27 @@ void loop() {
         LEDPtr(new BlinkingLED(RED, 3, 1))
     };
 
-    auto lightOneIt = lightOneStates.begin();
-    auto lightTwoIt = lightTwoStates.begin();
+    std::vector<LEDPtr> lightThreeStates {
+        LEDPtr(new LED(BLUE)),
+        LEDPtr(new BlinkingLED(RED, 4, 4)),
+        LEDPtr(new BlinkingLED(GREEN, 1, 1))
+    };
 
-    while (lightOneIt != lightOneStates.end() && lightTwoIt != lightOneStates.end()) {
-        auto light1 = *lightOneIt;
-        auto light2 = *lightTwoIt;
-        for (int i = 0; i < 50; i++) {
-            auto c1 = light1->getColor();
-            uint8_t output = colorToByte(c1);
+    auto iterations = min({lightOneStates.size(), lightTwoStates.size(), lightThreeStates.size()});
+    for (uint i = 0; i < iterations; i++) {
+        lights[0] = lightOneStates[i];
+        lights[1] = lightTwoStates[i];
+        lights[2] = lightThreeStates[i];
 
-            output = output<<3;
-            auto c2 = light2->getColor();
-            output += colorToByte(c2);
+        for (int step = 0; step < 50; ++step) {
+            auto output = convertColors(lights);
+            shiftOut(output);
 
-            digitalWrite(LATCH, LOW);
-            shiftOut(DATA, CLOCK, MSBFIRST, output);
-            digitalWrite(LATCH, HIGH);
+            for (auto light : lights) {
+                light->step();
+            }
 
-            light1->step();
-            light2->step();
-            delay(200);
+            delay(1000 / RATE);
         }
-
-        ++lightOneIt;
-        ++lightTwoIt;
     }
-
 }

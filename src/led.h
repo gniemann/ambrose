@@ -10,6 +10,7 @@
 class LED {
 public:
     LED(const Color &c) : color(c), on(true) {}
+    virtual ~LED() = default;
     void turnOn() { on = true; }
     void turnOff() { on = false; }
     bool isOn() const { return on; }
@@ -25,7 +26,7 @@ private:
 class BlinkingLED: public LED {
 public:
     BlinkingLED(const Color &c, int onPeriod, int offPeriod): LED(c), onInterval(onPeriod), offInterval(offPeriod), intervalCounter(0) {}
-    void step();
+    void step() override;
 private:
     void toggle();
 
@@ -39,7 +40,7 @@ class InitiallyBlinkingLED: public BlinkingLED {
 public:
     InitiallyBlinkingLED(const Color &c, int times, int onPeriod, int offPeriod): BlinkingLED(c, onPeriod, offPeriod), blinkTimes(times), isBlinking(true), currentTime(0) { }
 
-    void step();
+    void step() override;
 private:
     int blinkTimes;
     bool isBlinking;
