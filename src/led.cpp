@@ -28,3 +28,16 @@ void InitiallyBlinkingLED::step() {
         }
     }
 }
+
+Color MultistateLED::getColor() const {
+    return states[currentState].first->getColor();
+}
+
+void MultistateLED::step() {
+    if (++currentStep >= states[currentState].second) {
+        currentState = (currentState + 1) % states.size();
+        currentStep = 0;
+    } else {
+        states[currentState].first->step();
+    }
+}

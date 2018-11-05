@@ -5,18 +5,23 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
-#include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <vector>
+#include <array>
 #include "color.h"
 #include "led.h"
+#include "status_client.h"
 
 const char* ssid = "Bodhi";
 const char* password = "wtaguest";
+const char* status_url = "https://buildstatus2.herokuapp.com/stages";
+const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
 
 using Pin = uint8_t;
 using Hz = int;
-using LEDPtr = std::shared_ptr<LED>;
+
+constexpr std::size_t ledCNT = 4;
+using LEDArray = std::array<LEDPtr, ledCNT>;
 
 const Pin DATA = D5;
 const Pin CLOCK = D6;
@@ -24,7 +29,7 @@ const Pin LATCH = D7;
 
 const Hz RATE = 5;
 
-std::vector<LEDPtr> lights;
+LEDArray lights;
 
 void setupWifi() {
     WiFi.begin(ssid, password);
@@ -59,27 +64,14 @@ uint8_t colorToByte(const Color &c) {
     return output;
 }
 
-// this function converts up to 21 RGB LEDs into a 64-bit integer value
-//template<template<class ...> class Container, class ... Args>
-//uint64_t convertColors(const Container<LEDPtr, Args...> &leds) {
-//    uint64_t output = 0;
-//    for (auto&& light : leds) {
-//        output+=colorToByte(light->getColor());
-//        output = output<<3;
-//    }
-//
-//    return output;
-//}
 
-uint64_t convertColors(const std::vector<LEDPtr> &leds) {
-    if (leds.empty()) {
-        return 0;
-    }
 
-    auto it = leds.begin();
-    uint64_t output = colorToByte((*it)->getColor());
-    while (++it != leds.end()) {
-        output = (output<<3) + colorToByte((*it)->getColor());
+template <std::size_t N>
+uint64_t convertColors(const std::array<LEDPtr, N> &leds) {
+    uint64_t output = 0;
+
+    for (auto light: leds) {
+        output = (output<<3) + colorToByte(light->getColor());
     }
 
     return output;
@@ -105,14 +97,7 @@ void setup() {
     pinMode(LATCH, OUTPUT);
 
     // turn all LEDs off
-    shiftOut(UINT64_MAX);
-
-    // set up lights
-    lights.push_back(std::make_shared<LED>(RED));
-    lights.push_back(std::make_shared<LED>(GREEN));
-    lights.push_back(std::make_shared<LED>(BLUE));
-//    auto output = convertColors(lights);
-//    shiftOut(output);
+    shiftOut(0);
 
     digitalWrite(LED_BUILTIN, HIGH);
 
@@ -123,41 +108,47 @@ void setup() {
     digitalWrite(LED_BUILTIN, LOW);
 }
 
-// the loop function runs over and over again forever
-void loop() {
-    std::vector<LEDPtr> lightOneStates {
+LEDPtr make_multistate() {
+    std::vector<MultistateLED::State> states {
+        std::make_pair(LEDPtr(new LED(RED)), 5),
+        std::make_pair(LEDPtr(new LED(GREEN)), 5),
+        std::make_pair(LEDPtr(new LED(BLUE)), 5),
+        std::make_pair(LEDPtr(new LED(OFF)), 5)
+    };
+
+    return LEDPtr(new MultistateLED(states));
+}
+
+std::vector<LEDPtr> states {
+        make_multistate(),
         LEDPtr(new InitiallyBlinkingLED(RED, 15, 1, 1)),
         LEDPtr(new LED(GREEN)),
-        LEDPtr(new BlinkingLED(BLUE, 4, 1))
-    };
-
-    std::vector<LEDPtr> lightTwoStates {
+        LEDPtr(new BlinkingLED(BLUE, 4, 1)),
         LEDPtr(new BlinkingLED(GREEN, 2, 2)),
         LEDPtr(new InitiallyBlinkingLED(BLUE, 20, 2, 1)),
-        LEDPtr(new BlinkingLED(RED, 3, 1))
-    };
-
-    std::vector<LEDPtr> lightThreeStates {
+        LEDPtr(new BlinkingLED(RED, 3, 1)),
         LEDPtr(new LED(BLUE)),
         LEDPtr(new BlinkingLED(RED, 4, 4)),
-        LEDPtr(new BlinkingLED(GREEN, 1, 1))
-    };
+        LEDPtr(new BlinkingLED(GREEN, 1, 1)),
+        LEDPtr(new InitiallyBlinkingLED(GREEN, 10, 2, 1)),
+        LEDPtr(new LED(BLUE)),
+        LEDPtr(new InitiallyBlinkingLED(RED, 10, 2, 1))
+};
 
-    auto iterations = min({lightOneStates.size(), lightTwoStates.size(), lightThreeStates.size()});
-    for (uint i = 0; i < iterations; i++) {
-        lights[0] = lightOneStates[i];
-        lights[1] = lightTwoStates[i];
-        lights[2] = lightThreeStates[i];
+// the loop function runs over and over again forever
+void loop() {
+    for (auto& light: lights) {
+        light = states[random(0, states.size())];
+    }
 
-        for (int step = 0; step < 50; ++step) {
-            auto output = convertColors(lights);
-            shiftOut(output);
+    for (int step = 0; step < 50; ++step) {
+        auto output = convertColors(lights);
+        shiftOut(output);
 
-            for (auto light : lights) {
-                light->step();
-            }
-
-            delay(1000 / RATE);
+        for (auto light : lights) {
+            light->step();
         }
+
+        delay(1000 / RATE);
     }
 }
