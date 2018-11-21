@@ -5,16 +5,20 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
-#include <ESP8266mDNS.h>
 #include <vector>
 #include <array>
+#include <memory>
+#include <unordered_map>
 #include "color.h"
 #include "led.h"
 #include "status_client.h"
+#include "status.h"
+#include "config.h"
 
 const char* ssid = "Bodhi";
 const char* password = "wtaguest";
 const char* status_url = "https://buildstatus2.herokuapp.com/stages";
+const char* config_url = "https://buildstatus2.herokuapp.com/config";
 const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
 
 using Pin = uint8_t;
@@ -22,6 +26,7 @@ using Hz = int;
 
 constexpr std::size_t ledCNT = 4;
 using LEDArray = std::array<LEDPtr, ledCNT>;
+using LEDConfig = Configuration<ledCNT>;
 
 const Pin DATA = D5;
 const Pin CLOCK = D6;
@@ -30,6 +35,12 @@ const Pin LATCH = D7;
 const Hz RATE = 5;
 
 LEDArray lights;
+auto config = std::make_shared<LEDConfig>();
+StatusClient client(status_url, fingerprint);
+
+LEDPtr success(new LED(GREEN));
+LEDPtr failure(new LED(RED));
+LEDPtr off(new LED(OFF));
 
 void setupWifi() {
     WiFi.begin(ssid, password);
@@ -64,8 +75,6 @@ uint8_t colorToByte(const Color &c) {
     return output;
 }
 
-
-
 template <std::size_t N>
 uint64_t convertColors(const std::array<LEDPtr, N> &leds) {
     uint64_t output = 0;
@@ -88,6 +97,31 @@ void shiftOut(uint64_t output) {
     digitalWrite(LATCH, HIGH);
 }
 
+void setLights(const LEDArray &lights) {
+    shiftOut(convertColors(lights));
+}
+
+void getConfig() {
+    StatusClient configClient(config_url, fingerprint);
+    auto isComplete = false;
+
+    while (!isComplete) {
+        auto resp = configClient.get();
+
+        if (resp < 200 || resp >= 400) {
+            for (auto &light : lights) {
+                light = failure;
+            }
+
+            setLights(lights);
+            delay(60000);
+        } else {
+            isComplete = true;
+            config->init(configClient.getStream());
+        }
+    }
+}
+
 // the setup function runs once when you press reset or power the board
 void setup() {
     // initialize digital pin LED_BUILTIN as an output.
@@ -103,47 +137,62 @@ void setup() {
 
     Serial.begin(115200);
 
-//    setupWifi();
-
+    setupWifi();
     digitalWrite(LED_BUILTIN, LOW);
+
+    getConfig();
 }
 
-LEDPtr make_multistate() {
-    std::vector<MultistateLED::State> states {
-        std::make_pair(LEDPtr(new LED(RED)), 5),
-        std::make_pair(LEDPtr(new LED(GREEN)), 5),
-        std::make_pair(LEDPtr(new LED(BLUE)), 5),
-        std::make_pair(LEDPtr(new LED(OFF)), 5)
-    };
-
-    return LEDPtr(new MultistateLED(states));
-}
-
-std::vector<LEDPtr> states {
-        make_multistate(),
-        LEDPtr(new InitiallyBlinkingLED(RED, 15, 1, 1)),
-        LEDPtr(new LED(GREEN)),
-        LEDPtr(new BlinkingLED(BLUE, 4, 1)),
-        LEDPtr(new BlinkingLED(GREEN, 2, 2)),
-        LEDPtr(new InitiallyBlinkingLED(BLUE, 20, 2, 1)),
-        LEDPtr(new BlinkingLED(RED, 3, 1)),
-        LEDPtr(new LED(BLUE)),
-        LEDPtr(new BlinkingLED(RED, 4, 4)),
-        LEDPtr(new BlinkingLED(GREEN, 1, 1)),
-        LEDPtr(new InitiallyBlinkingLED(GREEN, 10, 2, 1)),
-        LEDPtr(new LED(BLUE)),
-        LEDPtr(new InitiallyBlinkingLED(RED, 10, 2, 1))
-};
-
+constexpr int iterations = RATE * 30;
 // the loop function runs over and over again forever
 void loop() {
-    for (auto& light: lights) {
-        light = states[random(0, states.size())];
+    auto resp = client.get();
+
+    Serial.println(resp);
+    LEDPtr toSet;
+
+
+    if (resp < 200 || resp >= 400) {
+        for (auto light: lights) {
+            light = failure;
+        }
+    } else {
+        auto statuses = parse_json(client.getStream());
+
+        for (auto s: statuses) {
+            config->update(*s);
+        }
+
+        auto light = lights.begin();
+        auto status = config->begin();
+
+        while (light != lights.end() && status != config->end()) {
+            if ((*status).second) {
+                switch ((*status).first) {
+                    case Status::SUCCEEDED:
+                        toSet = LEDPtr(new InitiallyBlinkingLED(GREEN, 20, 2, 1));
+                        break;
+                    case Status::FAILED:
+                        toSet = LEDPtr(new InitiallyBlinkingLED(RED, 20, 1, 1));
+                        break;
+                    case Status::IN_PROGRESS:
+                        toSet = LEDPtr(new BlinkingLED(BLUE, 4, 4));
+                        break;
+                    case Status::QUEUED:
+                        toSet = LEDPtr(new LED(BLUE));
+                    default:
+                        toSet = off;
+                }
+                *light = toSet;
+            }
+
+            ++light;
+            ++status;
+        }
     }
 
-    for (int step = 0; step < 50; ++step) {
-        auto output = convertColors(lights);
-        shiftOut(output);
+    for (int step = 0; step < iterations; ++step) {
+        setLights(lights);
 
         for (auto light : lights) {
             light->step();

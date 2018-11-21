@@ -6,12 +6,14 @@
 #define BUILD_MONITOR_CLIENT_H
 
 #include <ESP8266HTTPClient.h>
+#include <WiFiClient.h>
 
 class StatusClient {
 public:
     StatusClient(const char *url, const char *fingerprint): url(url), fingerprint(fingerprint) {}
 
-    std::string get();
+    int get();
+    WiFiClient& getStream();
 private:
     const char* url;
     const char* fingerprint;

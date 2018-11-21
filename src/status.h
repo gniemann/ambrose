@@ -8,6 +8,7 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <Stream.h>
 
 enum class Status {
     UNKNOWN = -1,
@@ -23,10 +24,18 @@ Status status_factory(const std::string &status);
 class Stage {
 public:
     Stage(std::string id, const Status &status): id(std::move(id)), status(status) {}
+    Stage(): id(""), status(Status::UNKNOWN) {}
 
     bool operator==(const Stage &rhs) const {
         return id == rhs.id && status == rhs.status;
     }
+
+    bool operator!=(const Stage &rhs) const {
+        return !(*this == rhs);
+    }
+
+    Status getStatus() const { return status; }
+    std::string getId() const { return id; }
 private:
     std::string id;
     Status status;
@@ -34,5 +43,5 @@ private:
 
 using Stages = std::vector<std::shared_ptr<Stage>>;
 
-Stages parse_json(const std::string &json);
+Stages parse_json(Stream& stream);
 #endif //BUILD_MONITOR_STATUS_H

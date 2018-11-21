@@ -9,8 +9,6 @@
 #include <vector>
 #include "color.h"
 
-
-
 class LED {
 public:
     LED(const Color &c) : color(c), on(true) {}

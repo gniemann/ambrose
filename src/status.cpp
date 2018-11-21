@@ -6,13 +6,23 @@
 #include <memory>
 #include <vector>
 #include <locale>
+#include <WiFiClient.h>
+#include <algorithm>
+#include <Arduino.h>
 #include "status.h"
 
 const int capacity = JSON_ARRAY_SIZE(4) + 4*JSON_OBJECT_SIZE(3) + 300;
 
+std::string uppercase(const std::string &str) {
+    std::string retVal(str.length(), ' ');
+
+    std::transform(str.cbegin(), str.cend(), retVal.begin(), [](char c) { return toupper(c); });
+    return retVal;
+}
+
 Status status_factory(const std::string &status) {
-    std::locale loc;
-    auto raised = std::toupper(status, loc).c_str();
+    auto raised = uppercase(status).c_str();
+    Serial.println(raised);
 
     // using strcmp here to avoid the cost of allocating and copying the strings
     if (strcmp(raised, "NOT_STARTED") == 0) {
@@ -30,20 +40,20 @@ Status status_factory(const std::string &status) {
     return Status::UNKNOWN;
 }
 
-Stages parse_json(const std::string &json) {
+Stages parse_json(Stream& stream) {
     Stages stages;
     StaticJsonBuffer<capacity> jsonBuffer;
-    auto& arr = jsonBuffer.parseArray(json.c_str());
+    auto& arr = jsonBuffer.parseArray(stream);
 
     if (!arr.success()) {
         return stages;
     }
 
     for (JsonObject& arrayVal: arr) {
-        auto id = arrayVal.get<char*>("id");
-        auto status = status_factory(arrayVal.get<char*>("status"));
+        std::string id = arrayVal["id"].as<char*>();
+        auto status = status_factory(arrayVal["status"].as<char*>());
 
-        if (strlen(id) == 0 || status == Status::UNKNOWN) {
+        if (id.empty()) {
             continue;
         }
 
