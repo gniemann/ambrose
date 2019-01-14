@@ -6,7 +6,7 @@
 #include <string>
 #include "status_client.h"
 
-const char *ETAG = "Etag";
+const char *ETAG = "ETag";
 const char *IF_NONE_MATCH = "If-None-Match";
 
 int StatusClient::get() {

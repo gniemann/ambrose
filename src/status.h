@@ -41,7 +41,7 @@ private:
     Status status;
 };
 
-using Stages = std::vector<std::shared_ptr<Stage>>;
+using Stages = std::vector<Stage>;
 
 Stages parse_json(Stream& stream);
 #endif //BUILD_MONITOR_STATUS_H

@@ -17,8 +17,7 @@
 
 const char* ssid = "Bodhi";
 const char* password = "wtaguest";
-const char* status_url = "https://buildstatus2.herokuapp.com/stages";
-const char* config_url = "https://buildstatus2.herokuapp.com/config";
+const char* status_url = "https://devops-status-monitor.herokuapp.com/api/status/releases";
 const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
 
 using Pin = uint8_t;
@@ -26,7 +25,6 @@ using Hz = int;
 
 constexpr std::size_t ledCNT = 4;
 using LEDArray = std::array<LEDPtr, ledCNT>;
-using LEDConfig = Configuration<ledCNT>;
 
 const Pin DATA = D5;
 const Pin CLOCK = D6;
@@ -35,10 +33,9 @@ const Pin LATCH = D7;
 const Hz RATE = 5;
 
 LEDArray lights;
-auto config = std::make_shared<LEDConfig>();
+auto config = std::make_shared<Configuration>();
 StatusClient client(status_url, fingerprint);
 
-LEDPtr success(new LED(GREEN));
 LEDPtr failure(new LED(RED));
 LEDPtr off(new LED(OFF));
 
@@ -101,27 +98,6 @@ void setLights(const LEDArray &lights) {
     shiftOut(convertColors(lights));
 }
 
-void getConfig() {
-    StatusClient configClient(config_url, fingerprint);
-    auto isComplete = false;
-
-    while (!isComplete) {
-        auto resp = configClient.get();
-
-        if (resp < 200 || resp >= 400) {
-            for (auto &light : lights) {
-                light = failure;
-            }
-
-            setLights(lights);
-            delay(60000);
-        } else {
-            isComplete = true;
-            config->init(configClient.getStream());
-        }
-    }
-}
-
 // the setup function runs once when you press reset or power the board
 void setup() {
     // initialize digital pin LED_BUILTIN as an output.
@@ -139,8 +115,21 @@ void setup() {
 
     setupWifi();
     digitalWrite(LED_BUILTIN, LOW);
+}
 
-    getConfig();
+std::shared_ptr<LED> ledFromStatus(const Status &status) {
+    switch (status) {
+        case Status::SUCCEEDED:
+            return LEDPtr(new InitiallyBlinkingLED(GREEN, 20, 2, 1));
+        case Status::FAILED:
+            return LEDPtr(new InitiallyBlinkingLED(RED, 20, 1, 1));
+        case Status::IN_PROGRESS:
+            return LEDPtr(new BlinkingLED(BLUE, 4, 4));
+        case Status::QUEUED:
+            return LEDPtr(new LED(BLUE));
+        default:
+            return off;
+    }
 }
 
 constexpr int iterations = RATE * 30;
@@ -149,41 +138,20 @@ void loop() {
     auto resp = client.get();
 
     Serial.println(resp);
-    LEDPtr toSet;
-
-
     if (resp < 200 || resp >= 400) {
         for (auto light: lights) {
             light = failure;
         }
-    } else {
+    } else if (resp != 304) {
         auto statuses = parse_json(client.getStream());
-
-        for (auto s: statuses) {
-            config->update(*s);
-        }
+        config->update(statuses);
 
         auto light = lights.begin();
         auto status = config->begin();
 
         while (light != lights.end() && status != config->end()) {
             if ((*status).second) {
-                switch ((*status).first) {
-                    case Status::SUCCEEDED:
-                        toSet = LEDPtr(new InitiallyBlinkingLED(GREEN, 20, 2, 1));
-                        break;
-                    case Status::FAILED:
-                        toSet = LEDPtr(new InitiallyBlinkingLED(RED, 20, 1, 1));
-                        break;
-                    case Status::IN_PROGRESS:
-                        toSet = LEDPtr(new BlinkingLED(BLUE, 4, 4));
-                        break;
-                    case Status::QUEUED:
-                        toSet = LEDPtr(new LED(BLUE));
-                    default:
-                        toSet = off;
-                }
-                *light = toSet;
+                *light = ledFromStatus((*status).first);
             }
 
             ++light;
