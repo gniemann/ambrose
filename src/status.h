@@ -16,7 +16,8 @@ enum class Status {
     QUEUED = 1,
     IN_PROGRESS = 2,
     SUCCEEDED = 3,
-    FAILED = 4
+    PENDING_APPROVAL = 4,
+    FAILED = 5,
 };
 
 Status status_factory(const std::string &status);

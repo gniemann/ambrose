@@ -24,12 +24,6 @@ public:
         bool operator==(const ConfigIterator &rhs) const { return pos == rhs.pos; }
         bool operator!=(const ConfigIterator &rhs) const { return !(*this == rhs); }
         ConfigIterator& operator++() { ++pos; return *this; }
-
-        ConfigIterator& operator++(int) {
-            ConfigIterator clone(*this);
-            ++pos;
-            return clone;
-        }
     };
 
     Stage operator[](std::size_t index) const { return stages[index]; }

@@ -17,13 +17,13 @@
 
 const char* ssid = "Bodhi";
 const char* password = "wtaguest";
-const char* status_url = "https://devops-status-monitor.herokuapp.com/api/status/releases";
+const char* status_url = "https://devops-status-monitor.herokuapp.com/api/status";
 const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
 
 using Pin = uint8_t;
 using Hz = int;
 
-constexpr std::size_t ledCNT = 4;
+constexpr std::size_t ledCNT = 8;
 using LEDArray = std::array<LEDPtr, ledCNT>;
 
 const Pin DATA = D5;
@@ -75,22 +75,21 @@ uint8_t colorToByte(const Color &c) {
 template <std::size_t N>
 uint64_t convertColors(const std::array<LEDPtr, N> &leds) {
     uint64_t output = 0;
-
-    for (auto light: leds) {
-        output = (output<<3) + colorToByte(light->getColor());
+    // need to output in reverse order, so that the first light goes in thh first position
+    for (auto iter = leds.rbegin(); iter != leds.rend(); ++iter) {
+        output = (output<<3) + colorToByte((*iter)->getColor());
     }
-
     return output;
 }
 
 void shiftOut(uint64_t output) {
     digitalWrite(LATCH, LOW);
 
-    for (int i = sizeof(uint64_t); i >= 0; i-=8) {
+    for (int i = sizeof(uint64_t) * 7; i >= 0; i-=8) {
         uint8_t shift = (output >> i) & 0xFF;
+//        Serial.println(shift, BIN);
         shiftOut(DATA, CLOCK, MSBFIRST, ~shift);
     }
-
     digitalWrite(LATCH, HIGH);
 }
 
@@ -127,6 +126,8 @@ std::shared_ptr<LED> ledFromStatus(const Status &status) {
             return LEDPtr(new BlinkingLED(BLUE, 4, 4));
         case Status::QUEUED:
             return LEDPtr(new LED(BLUE));
+        case Status::PENDING_APPROVAL:
+            return LEDPtr(new LED(MAGENTA));
         default:
             return off;
     }
@@ -150,7 +151,7 @@ void loop() {
         auto status = config->begin();
 
         while (light != lights.end() && status != config->end()) {
-            if ((*status).second) {
+            if ((*status).second || *light == nullptr) {
                 *light = ledFromStatus((*status).first);
             }
 

@@ -22,7 +22,6 @@ std::string uppercase(const std::string &str) {
 
 Status status_factory(const std::string &status) {
     auto raised = uppercase(status).c_str();
-    Serial.println(raised);
 
     // using strcmp here to avoid the cost of allocating and copying the strings
     if (strcmp(raised, "NOT_STARTED") == 0) {
@@ -36,7 +35,9 @@ Status status_factory(const std::string &status) {
     } else if (strcmp(raised, "FAILED") == 0) {
         return Status::FAILED;
     } else if (strcmp(raised, "REJECTED") == 0) {
-        return Status ::FAILED;
+        return Status::FAILED;
+    } else if (strcmp(raised, "PENDING_APPROVAL") == 0) {
+        return Status::PENDING_APPROVAL;
     }
 
     return Status::UNKNOWN;

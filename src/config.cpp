@@ -12,7 +12,7 @@ void Configuration::update(std::vector<Stage> newStages) {
     auto hasChangedIter = hasChanged.begin();
 
     for (auto&& stage: stages) {
-        *hasChangedIter = stage == *newStageIter;
+        *hasChangedIter = stage != *newStageIter;
         stage = *newStageIter;
         hasChangedIter++;
         newStageIter++;
