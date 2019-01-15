@@ -11,6 +11,7 @@
 
 class LED {
 public:
+    LED() : color(OFF) {}
     LED(const Color &c) : color(c), on(true) {}
     virtual ~LED() = default;
     void turnOn() { on = true; }
@@ -51,17 +52,17 @@ private:
     int currentTime;
 };
 
-class MultistateLED: public LED {
+class AlternatingLED: public LED {
 public:
-    using State = std::pair<LEDPtr, int>;
+    AlternatingLED(const Color &c1, const Color &c2, int p1, int p2): color1(c1), color2(c2), period1(p1), period2(p2), intervalCounter(0) {}
 
-    MultistateLED(const std::vector<State> &states): LED(OFF), states(states), currentState(0), currentStep(0) {}
     void step() override;
     Color getColor() const override;
 private:
-    std::vector<State> states;
-    int currentState;
-    int currentStep;
+    Color color1, color2;
+    int period1, period2;
+    int intervalCounter;
 };
+
 
 #endif //BUILD_MONITOR_LED_H

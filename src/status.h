@@ -24,8 +24,8 @@ Status status_factory(const std::string &status);
 
 class Stage {
 public:
-    Stage(std::string id, const Status &status): id(std::move(id)), status(status) {}
-    Stage(): id(""), status(Status::UNKNOWN) {}
+    Stage(std::string id, const Status &status): id(std::move(id)), status(status), prevStatus(Status::UNKNOWN) {}
+    Stage(): id(""), status(Status::UNKNOWN), prevStatus(Status::UNKNOWN) {}
 
     bool operator==(const Stage &rhs) const {
         return id == rhs.id && status == rhs.status;
@@ -35,11 +35,17 @@ public:
         return !(*this == rhs);
     }
 
+    bool isChanged() const { return status != prevStatus; }
+
     Status getStatus() const { return status; }
+    Status getPrevStatus() const { return prevStatus; }
     std::string getId() const { return id; }
+
+    void setPrevStatus(Status prevStatus) { this->prevStatus = prevStatus; }
 private:
     std::string id;
     Status status;
+    Status prevStatus;
 };
 
 using Stages = std::vector<Stage>;

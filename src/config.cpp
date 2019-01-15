@@ -5,16 +5,12 @@
 #include "config.h"
 
 void Configuration::update(std::vector<Stage> newStages) {
-    hasChanged.resize(newStages.size());
     stages.resize(newStages.size());
 
     auto newStageIter = newStages.begin();
-    auto hasChangedIter = hasChanged.begin();
-
     for (auto&& stage: stages) {
-        *hasChangedIter = stage != *newStageIter;
+        newStageIter->setPrevStatus(stage.getStatus());
         stage = *newStageIter;
-        hasChangedIter++;
         newStageIter++;
     }
 }

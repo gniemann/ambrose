@@ -29,15 +29,10 @@ void InitiallyBlinkingLED::step() {
     }
 }
 
-Color MultistateLED::getColor() const {
-    return states[currentState].first->getColor();
+void AlternatingLED::step() {
+    intervalCounter = (intervalCounter) % (period1 + period2) + 1;
 }
 
-void MultistateLED::step() {
-    if (++currentStep >= states[currentState].second) {
-        currentState = (currentState + 1) % states.size();
-        currentStep = 0;
-    } else {
-        states[currentState].first->step();
-    }
+Color AlternatingLED::getColor() const {
+    return (intervalCounter <= period1) ? color1 : color2;
 }

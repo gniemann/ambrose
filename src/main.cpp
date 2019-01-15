@@ -116,18 +116,34 @@ void setup() {
     digitalWrite(LED_BUILTIN, LOW);
 }
 
-std::shared_ptr<LED> ledFromStatus(const Status &status) {
+Color colorForStatus(const Status &status) {
     switch (status) {
         case Status::SUCCEEDED:
-            return LEDPtr(new InitiallyBlinkingLED(GREEN, 20, 2, 1));
+            return GREEN;
         case Status::FAILED:
-            return LEDPtr(new InitiallyBlinkingLED(RED, 20, 1, 1));
-        case Status::IN_PROGRESS:
-            return LEDPtr(new BlinkingLED(BLUE, 4, 4));
+            return RED;
         case Status::QUEUED:
-            return LEDPtr(new LED(BLUE));
+        case Status::IN_PROGRESS:
+            return BLUE;
         case Status::PENDING_APPROVAL:
-            return LEDPtr(new LED(MAGENTA));
+            return MAGENTA;
+        default:
+            return OFF;
+    }
+}
+
+std::shared_ptr<LED> ledForStage(const Stage &stage) {
+    auto primaryColor = colorForStatus(stage.getStatus());
+    switch (stage.getStatus()) {
+        case Status::SUCCEEDED:
+            return LEDPtr(new InitiallyBlinkingLED(primaryColor, 20, 2, 1));
+        case Status::FAILED:
+            return LEDPtr(new InitiallyBlinkingLED(primaryColor, 20, 1, 1));
+        case Status::IN_PROGRESS:
+        case Status::QUEUED:
+            return LEDPtr(new AlternatingLED(primaryColor, colorForStatus(stage.getPrevStatus()), 4, 4));
+        case Status::PENDING_APPROVAL:
+            return LEDPtr(new LED(primaryColor));
         default:
             return off;
     }
@@ -148,15 +164,15 @@ void loop() {
         config->update(statuses);
 
         auto light = lights.begin();
-        auto status = config->begin();
+        auto stage = config->begin();
 
-        while (light != lights.end() && status != config->end()) {
-            if ((*status).second || *light == nullptr) {
-                *light = ledFromStatus((*status).first);
+        while (light != lights.end() && stage != config->end()) {
+            if (stage->isChanged() || *light == nullptr) {
+                *light = ledForStage(*stage);
             }
 
             ++light;
-            ++status;
+            ++stage;
         }
     }
 
