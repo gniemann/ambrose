@@ -8,6 +8,7 @@
 
 const char *ETAG = "ETag";
 const char *IF_NONE_MATCH = "If-None-Match";
+const char *AUTHORIZATION = "Authorization";
 
 int StatusClient::get() {
     client.end();
@@ -17,6 +18,7 @@ int StatusClient::get() {
     }
 
     client.addHeader(IF_NONE_MATCH, etag.c_str());
+    client.addHeader(AUTHORIZATION, authoriation);
 
     auto status = client.GET();
     if (status < 200 || status >= 400) {

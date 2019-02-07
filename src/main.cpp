@@ -20,10 +20,12 @@ const char* password = "wtaguest";
 const char* status_url = "https://devops-status-monitor.herokuapp.com/api/status";
 const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
 
+const char* authorization = "Basic Z3JlZy5uaWVtYW5uQHdpbGxvd3RyZWVhcHBzLmNvbTphd2Vzb21lX3Bhc3N3b3Jk";
+
 using Pin = uint8_t;
 using Hz = int;
 
-constexpr std::size_t ledCNT = 8;
+constexpr std::size_t ledCNT = 9;
 using LEDArray = std::array<LEDPtr, ledCNT>;
 
 const Pin DATA = D5;
@@ -34,7 +36,7 @@ const Hz RATE = 5;
 
 LEDArray lights;
 auto config = std::make_shared<Configuration>();
-StatusClient client(status_url, fingerprint);
+StatusClient client(status_url, fingerprint, authorization);
 
 LEDPtr failure(new LED(RED));
 LEDPtr off(new LED(OFF));

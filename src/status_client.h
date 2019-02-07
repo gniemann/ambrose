@@ -10,13 +10,14 @@
 
 class StatusClient {
 public:
-    StatusClient(const char *url, const char *fingerprint): url(url), fingerprint(fingerprint) {}
+    StatusClient(const char *url, const char *fingerprint, const char *authorization): url(url), fingerprint(fingerprint), authoriation(authorization) {}
 
     int get();
     WiFiClient& getStream();
 private:
     const char* url;
     const char* fingerprint;
+    const char* authoriation;
     std::string etag;
     HTTPClient client;
 
