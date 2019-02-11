@@ -13,12 +13,12 @@ const char *AUTHORIZATION = "Authorization";
 int StatusClient::get() {
     client.end();
 
-    if (!client.begin(url, fingerprint)) {
+    if (!client.begin(url.c_str(), fingerprint.c_str())) {
         return 0;
     }
 
     client.addHeader(IF_NONE_MATCH, etag.c_str());
-    client.addHeader(AUTHORIZATION, authoriation);
+    client.addHeader(AUTHORIZATION, authorization.c_str());
 
     auto status = client.GET();
     if (status < 200 || status >= 400) {

@@ -5,20 +5,15 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
-#include <memory>
-#include "color.h"
-#include "led.h"
 #include "status_client.h"
 #include "status.h"
 #include "config.h"
 #include "light_manager.h"
+#include "setup_server.h"
+#include "SettingsManager.h"
 
-const char* ssid = "Bodhi";
-const char* password = "wtaguest";
 const char* status_url = "https://devops-status-monitor.herokuapp.com/api/status";
 const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
-
-const char* authorization = "Basic Z3JlZy5uaWVtYW5uQHdpbGxvd3RyZWVhcHBzLmNvbTphd2Vzb21lX3Bhc3N3b3Jk";
 
 using Pin = uint8_t;
 using Hz = int;
@@ -33,10 +28,11 @@ const Hz RATE = 5;
 
 auto config = std::make_shared<Configuration>();
 auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>();
-StatusClient client(status_url, fingerprint, authorization);
 
-void setupWifi() {
-    WiFi.begin(ssid, password);
+std::shared_ptr<StatusClient> client;
+
+void setupWifi(const std::string &ssid, const std::string &password) {
+    WiFi.begin(ssid.c_str(), password.c_str());
     Serial.print("Connecting:");
     // Wait for connection
     while (WiFi.status() != WL_CONNECTED) {
@@ -45,7 +41,7 @@ void setupWifi() {
     }
     Serial.println("");
     Serial.print("Connected to ");
-    Serial.println(ssid);
+    Serial.println(ssid.c_str());
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 }
@@ -65,20 +61,28 @@ void setup() {
 
     Serial.begin(115200);
 
-    setupWifi();
+    SettingsManager settingsManager;
+    if (!settingsManager.checkForSettings()) {
+        settingsManager.remoteSetup();
+    }
+
+    setupWifi(settingsManager.getSSID(), settingsManager.getWiFiPassword());
+
+    client = std::make_shared<StatusClient>(status_url, fingerprint, settingsManager.getAuthorization());
+
     digitalWrite(LED_BUILTIN, LOW);
 }
 
 constexpr int iterations = RATE * 30;
 // the loop function runs over and over again forever
 void loop() {
-    auto resp = client.get();
+    auto resp = client->get();
 
     Serial.println(resp);
     if (resp < 200 || resp >= 400) {
         lights.failure();
     } else if (resp != 304) {
-        auto statuses = parse_json(client.getStream());
+        auto statuses = parse_json(client->getStream());
         config->update(statuses);
         lights.update(config.get());
     }
