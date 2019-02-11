@@ -33,7 +33,8 @@ std::shared_ptr<StatusClient> client;
 
 void setupWifi(const std::string &ssid, const std::string &password) {
     WiFi.begin(ssid.c_str(), password.c_str());
-    Serial.print("Connecting:");
+    Serial.print("Connecting");
+
     // Wait for connection
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);

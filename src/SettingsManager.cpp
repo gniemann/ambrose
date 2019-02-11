@@ -5,6 +5,7 @@
 #include <ESP8266WiFi.h>
 #include "SettingsManager.h"
 #include "setup_server.h"
+#include <FS.h>
 
 const std::string base64_chars =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -53,6 +54,43 @@ std::string base64_encode(char const* bytes_to_encode, unsigned int in_len) {
 
 }
 
+SettingsManager::SettingsManager() {
+    SPIFFS.begin();
+}
+
+SettingsManager::~SettingsManager() {
+    SPIFFS.end();
+}
+
+bool SettingsManager::checkForSettings() {
+    if (SPIFFS.exists(ssidFilename) && SPIFFS.exists(wifiPasswordFilename) && SPIFFS.exists(authFilename)) {
+        auto SSIDFile = SPIFFS.open(ssidFilename, "r");
+        if (!SSIDFile) {
+            return false;
+        }
+        ssid = SSIDFile.readString().c_str();
+        SSIDFile.close();
+
+        auto passwordFile = SPIFFS.open(wifiPasswordFilename, "r");
+        if (!passwordFile) {
+            return false;
+        }
+        wifiPassword = passwordFile.readString().c_str();
+        passwordFile.close();
+
+        auto authFile = SPIFFS.open(authFilename, "r");
+        if (!authFile) {
+            return false;
+        }
+        authorization = authFile.readString().c_str();
+        authFile.close();
+
+        return true;
+    }
+
+    return false;
+}
+
 void SettingsManager::remoteSetup() {
     WiFi.softAP("devops_monitor_ap");
     Serial.print("IP address: ");
@@ -67,11 +105,19 @@ void SettingsManager::remoteSetup() {
 
     ssid = settings.ssid;
     wifiPassword = settings.wifiPassword;
-    username = settings.username;
-    password = settings.token;
-}
 
-std::string SettingsManager::getAuthorization() const {
-    std::string authString = username + ":" + password;
-    return "Basic " + base64_encode(authString.c_str(), authString.size());
+    std::string authString = settings.username + ":" + settings.token;
+    authorization = "Basic " + base64_encode(authString.c_str(), authString.size());
+
+    auto ssidFile = SPIFFS.open(ssidFilename, "w");
+    ssidFile.write((const uint8_t*)ssid.c_str(), ssid.size());
+    ssidFile.close();
+
+    auto passwordFile = SPIFFS.open(wifiPasswordFilename, "w");
+    passwordFile.write((const uint8_t*)wifiPassword.c_str(), wifiPassword.size());
+    passwordFile.close();
+
+    auto authFile = SPIFFS.open(authFilename, "w");
+    authFile.write((const uint8_t*)authorization.c_str(), authorization.size());
+    authFile.close();
 }

@@ -8,19 +8,24 @@
 
 class SettingsManager {
 public:
+    SettingsManager();
+    ~SettingsManager();
 
-    bool checkForSettings() { return false; }
+    bool checkForSettings();
 
     void remoteSetup();
 
     std::string getSSID() const { return ssid; }
     std::string getWiFiPassword() const { return wifiPassword; }
-    std::string getAuthorization() const;
+    std::string getAuthorization() const { return authorization; }
 private:
+    const char *ssidFilename = "/ssid";
+    const char *wifiPasswordFilename = "/wifiPassword";
+    const char *authFilename = "/authorization";
+
     std::string ssid;
     std::string wifiPassword;
-    std::string username;
-    std::string password;
+    std::string authorization;
 };
 
 
