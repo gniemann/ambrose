@@ -16,12 +16,14 @@ using Pin = uint8_t;
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
 class LightManager {
 public:
+    LightManager(): isNormalOperation(true) {}
     void off();
     void failure();
     void update(Configuration *config);
     void setLights() const;
     void step();
 private:
+    bool isNormalOperation;
     std::array<LEDPtr, N> lights;
 
     void setAll(LEDPtr led);
@@ -86,12 +88,14 @@ void LightManager<DATA, CLOCK, LATCH, N>::setAll(std::shared_ptr<LED> led) {
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
 void LightManager<DATA, CLOCK, LATCH, N>::off() {
+    isNormalOperation = false;
     LEDPtr off(new LED(OFF));
     setAll(off);
 }
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
 void LightManager<DATA, CLOCK, LATCH, N>::failure() {
+    isNormalOperation = false;
     LEDPtr failure(new LED(RED));
     setAll(failure);
 }
@@ -102,13 +106,15 @@ void LightManager<DATA, CLOCK, LATCH, N>::update(Configuration *config) {
     auto stage = config->begin();
 
     while (light != lights.end() && stage != config->end()) {
-        if (stage->isChanged() || *light == nullptr) {
+        if (!isNormalOperation || stage->isChanged() || *light == nullptr) {
             *light = ledForStage(*stage);
         }
 
         ++light;
         ++stage;
     }
+
+    isNormalOperation = true;
 }
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>

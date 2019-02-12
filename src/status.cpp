@@ -11,7 +11,7 @@
 #include <Arduino.h>
 #include "status.h"
 
-const int capacity = JSON_ARRAY_SIZE(12) + 12*JSON_OBJECT_SIZE(3) + 1000;
+const int capacity = JSON_ARRAY_SIZE(20) + 12*JSON_OBJECT_SIZE(3) + 1000;
 
 std::string uppercase(const std::string &str) {
     std::string retVal(str.length(), ' ');
@@ -46,7 +46,8 @@ Status status_factory(const std::string &status) {
 Stages parse_json(Stream& stream) {
     Stages stages;
     StaticJsonBuffer<capacity> jsonBuffer;
-    auto& arr = jsonBuffer.parseArray(stream);
+    auto& root = jsonBuffer.parseObject(stream);
+    auto& arr = root.get<JsonArray>("tasks");
 
     if (!arr.success()) {
         return stages;
