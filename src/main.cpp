@@ -11,6 +11,7 @@
 #include "light_manager.h"
 #include "setup_server.h"
 #include "SettingsManager.h"
+#include "MessageManager.h"
 
 const char* status_url = "https://devops-status-monitor.herokuapp.com/api/status";
 const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
@@ -46,6 +47,7 @@ void setupWifi(const std::string &ssid, const std::string &password) {
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 }
+MessageManager<2, D2, D1> messageManager;
 
 // the setup function runs once when you press reset or power the board
 void setup() {
@@ -72,6 +74,7 @@ void setup() {
     client = std::make_shared<StatusClient>(status_url, fingerprint, settingsManager.getAuthorization());
 
     digitalWrite(LED_BUILTIN, LOW);
+    messageManager.setMessage("HELLO ME");
 }
 
 constexpr int iterations = RATE * 30;
@@ -83,15 +86,20 @@ void loop() {
     if (resp < 200 || resp >= 400) {
         lights.failure();
     } else if (resp != 304) {
-        auto statuses = parse_json(client->getStream());
-        config->update(statuses);
+        auto update = parse_json(client->getStream());
+        config->update(update.stages);
         lights.update(config.get());
+
+        if (update.messages.size() > 0) {
+            messageManager.setMessage(update.messages[0]);
+        }
     }
 
     for (int step = 0; step < iterations; ++step) {
         lights.setLights();
         lights.step();
-
+        messageManager.writeOut();
+        messageManager.step();
         delay(1000 / RATE);
     }
 }

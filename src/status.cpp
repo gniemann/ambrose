@@ -43,14 +43,15 @@ Status status_factory(const std::string &status) {
     return Status::UNKNOWN;
 }
 
-Stages parse_json(Stream& stream) {
-    Stages stages;
+Updates parse_json(Stream& stream) {
+    Updates updates;
+
     StaticJsonBuffer<capacity> jsonBuffer;
     auto& root = jsonBuffer.parseObject(stream);
     auto& arr = root.get<JsonArray>("tasks");
 
     if (!arr.success()) {
-        return stages;
+        return updates;
     }
 
     for (JsonObject& arrayVal: arr) {
@@ -61,8 +62,13 @@ Stages parse_json(Stream& stream) {
             continue;
         }
 
-        stages.emplace_back(id, status);
+        updates.stages.emplace_back(id, status);
     }
 
-    return stages;
+    auto& msgArr = root.get<JsonArray>("messages");
+    for (const char* msg: msgArr) {
+        updates.messages.emplace_back(msg);
+    }
+
+    return updates;
 }

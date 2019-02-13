@@ -49,6 +49,13 @@ private:
 };
 
 using Stages = std::vector<Stage>;
+using Messages = std::vector<std::string>;
 
-Stages parse_json(Stream& stream);
+typedef struct {
+    Stages stages;
+    Messages messages;
+} Updates;
+
+
+Updates parse_json(Stream& stream);
 #endif //BUILD_MONITOR_STATUS_H
