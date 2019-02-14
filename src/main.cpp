@@ -47,7 +47,7 @@ void setupWifi(const std::string &ssid, const std::string &password) {
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 }
-MessageManager<2, D2, D1> messageManager;
+MessageManager<6, D2, D1> messageManager;
 
 // the setup function runs once when you press reset or power the board
 void setup() {
@@ -59,6 +59,7 @@ void setup() {
 
     // turn all LEDs off
     lights.off();
+    messageManager.clear();
 
     digitalWrite(LED_BUILTIN, HIGH);
 
@@ -74,10 +75,9 @@ void setup() {
     client = std::make_shared<StatusClient>(status_url, fingerprint, settingsManager.getAuthorization());
 
     digitalWrite(LED_BUILTIN, LOW);
-    messageManager.setMessage("HELLO ME");
 }
 
-constexpr int iterations = RATE * 30;
+constexpr int iterations = RATE * 60;
 // the loop function runs over and over again forever
 void loop() {
     auto resp = client->get();
@@ -85,14 +85,15 @@ void loop() {
     Serial.println(resp);
     if (resp < 200 || resp >= 400) {
         lights.failure();
+        char buffer[10];
+        sprintf(buffer, "%d", resp);
+        std::string message = "Request failed - " + std::string(buffer);
+        messageManager.setMessage(message);
     } else if (resp != 304) {
         auto update = parse_json(client->getStream());
         config->update(update.stages);
         lights.update(config.get());
-
-        if (update.messages.size() > 0) {
-            messageManager.setMessage(update.messages[0]);
-        }
+        messageManager.setMessages(update.messages);
     }
 
     for (int step = 0; step < iterations; ++step) {

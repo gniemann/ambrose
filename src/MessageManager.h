@@ -7,6 +7,7 @@
 
 #include <string>
 #include <array>
+#include <deque>
 #include <Adafruit_LEDBackpack.h>
 #include <Wire.h>
 
@@ -16,12 +17,19 @@ public:
     MessageManager();
 
     void setMessage(const std::string msg);
+
+    void setMessages(const Messages &newMessages);
+
     void writeOut();
     void step();
+    void clear();
 private:
+    void next();
+
     static constexpr size_t numCharacters = NumSegments * 4;
     std::array<Adafruit_AlphaNum4, NumSegments> segments;
     std::string currentMessage;
+    std::deque<std::string> messages;
     int startPosition;
     int pauseSteps;
 };
@@ -37,11 +45,16 @@ MessageManager<NumSegments, SDA, SCL>::MessageManager() {
 
 template <int NumSegments, uint8_t SDA, uint8_t SCL>
 void MessageManager<NumSegments, SDA, SCL>::setMessage(const std::string msg) {
-    for (auto segment: segments) {
-        segment.clear();
+    messages.clear();
+    messages.push_back(msg);
+}
+
+template<int NumSegments, uint8_t SDA, uint8_t SCL>
+void MessageManager<NumSegments, SDA, SCL>::setMessages(const Messages &newMessages) {
+    messages.clear();
+    for (auto msg: newMessages) {
+        messages.push_back(msg);
     }
-    currentMessage = std::string(numCharacters, ' ') + msg;
-    startPosition = 0;
 }
 
 template <int NumSegments, uint8_t SDA, uint8_t SCL>
@@ -52,9 +65,26 @@ void MessageManager<NumSegments, SDA, SCL>::writeOut() {
 }
 
 template <int NumSegments, uint8_t SDA, uint8_t SCL>
+void MessageManager<NumSegments, SDA, SCL>::clear() {
+    for (auto& segment: segments) {
+        segment.clear();
+        segment.writeDisplay();
+    }
+}
+
+template <int NumSegments, uint8_t SDA, uint8_t SCL>
 void MessageManager<NumSegments, SDA, SCL>::step() {
+    if (currentMessage.empty()) {
+        next();
+    }
+
     if (startPosition > currentMessage.size() - numCharacters - 1) {
-        return;
+        if (++pauseSteps > 10) {
+            pauseSteps = 0;
+            next();
+        } else {
+            return;
+        }
     }
 
     if (startPosition % numCharacters == 0) {
@@ -71,6 +101,31 @@ void MessageManager<NumSegments, SDA, SCL>::step() {
             segment.writeDigitAscii(j, currentMessage[index++]);
         }
     }
+}
+
+template <int NumSegments, uint8_t SDA, uint8_t SCL>
+void MessageManager<NumSegments, SDA, SCL>::next() {
+    if (messages.size() == 0) {
+        return;
+    }
+
+    auto msg = messages.front();
+    messages.pop_front();
+    messages.push_back(msg);
+
+    if (msg.size() < numCharacters) {
+        msg += std::string(numCharacters - msg.size(), ' ');
+    }
+
+    msg = std::string(numCharacters, ' ') + msg;
+
+    if (currentMessage.size() > 0) {
+        auto trail = currentMessage.substr(currentMessage.size() - numCharacters, numCharacters);
+        msg = trail + msg;
+    }
+
+    currentMessage = msg;
+    startPosition = 0;
 }
 
 
