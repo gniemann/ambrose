@@ -9,7 +9,6 @@
 #include <array>
 #include <algorithm>
 #include "led.h"
-#include "config.h"
 
 using Pin = uint8_t;
 
@@ -19,7 +18,7 @@ public:
     LightManager(): isNormalOperation(true) {}
     void off();
     void failure();
-    void update(Configuration *config);
+    void update(const Lights &newLights);
     void setLights() const;
     void step();
 private:
@@ -28,39 +27,6 @@ private:
 
     void setAll(LEDPtr led);
 };
-
-Color colorForStatus(const Status &status) {
-    switch (status) {
-        case Status::SUCCEEDED:
-            return GREEN;
-        case Status::FAILED:
-            return RED;
-        case Status::QUEUED:
-        case Status::IN_PROGRESS:
-            return BLUE;
-        case Status::PENDING_APPROVAL:
-            return MAGENTA;
-        default:
-            return OFF;
-    }
-}
-
-std::shared_ptr<LED> ledForStage(const Stage &stage) {
-    auto primaryColor = colorForStatus(stage.getStatus());
-    switch (stage.getStatus()) {
-        case Status::SUCCEEDED:
-            return LEDPtr(new InitiallyBlinkingLED(primaryColor, 20, 2, 1));
-        case Status::FAILED:
-            return LEDPtr(new InitiallyBlinkingLED(primaryColor, 20, 1, 1));
-        case Status::IN_PROGRESS:
-        case Status::QUEUED:
-            return LEDPtr(new AlternatingLED(primaryColor, colorForStatus(stage.getPrevStatus()), 4, 4));
-        case Status::PENDING_APPROVAL:
-            return LEDPtr(new LED(primaryColor));
-        default:
-            return LEDPtr(new LED(OFF));
-    }
-}
 
 uint8_t colorToByte(const Color &c) {
     uint8_t output = 0;
@@ -88,33 +54,33 @@ void LightManager<DATA, CLOCK, LATCH, N>::setAll(std::shared_ptr<LED> led) {
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
 void LightManager<DATA, CLOCK, LATCH, N>::off() {
-    isNormalOperation = false;
     LEDPtr off(new LED(OFF));
     setAll(off);
 }
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
 void LightManager<DATA, CLOCK, LATCH, N>::failure() {
-    isNormalOperation = false;
     LEDPtr failure(new LED(RED));
     setAll(failure);
 }
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
-void LightManager<DATA, CLOCK, LATCH, N>::update(Configuration *config) {
+void LightManager<DATA, CLOCK, LATCH, N>::update(const Lights &newLights) {
     auto light = lights.begin();
-    auto stage = config->begin();
-
-    while (light != lights.end() && stage != config->end()) {
-        if (!isNormalOperation || stage->isChanged() || *light == nullptr) {
-            *light = ledForStage(*stage);
-        }
-
+    auto newLight = newLights.begin();
+    
+    while (light != lights.end() && newLight != newLights.end()) {
+        *light = *newLight;
+        
         ++light;
-        ++stage;
+        ++newLight;
     }
-
-    isNormalOperation = true;
+    
+    // set the rest of the lights off, if we didn't receive all lights
+    while (light != lights.end()) {
+        *light = std::make_shared<LED>(OFF);
+        ++light;
+    }
 }
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>

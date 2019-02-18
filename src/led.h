@@ -7,7 +7,9 @@
 
 #include <memory>
 #include <vector>
+#include <Stream.h>
 #include "color.h"
+#include <ArduinoJson.h>
 
 class LED {
 public:
@@ -27,6 +29,7 @@ private:
 };
 
 using LEDPtr = std::shared_ptr<LED>;
+using Lights = std::vector<LEDPtr>;
 
 class BlinkingLED: public LED {
 public:
@@ -64,5 +67,7 @@ private:
     int intervalCounter;
 };
 
+LEDPtr lightFromJSONObject(JsonObject &obj);
+Lights lightsFromJSONArray(JsonArray &array);
 
 #endif //BUILD_MONITOR_LED_H

@@ -6,8 +6,6 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include "status_client.h"
-#include "status.h"
-#include "config.h"
 #include "light_manager.h"
 #include "setup_server.h"
 #include "SettingsManager.h"
@@ -29,7 +27,6 @@ const Pin LATCH = D7;
 
 const Hz RATE = 5;
 
-auto config = std::make_shared<Configuration>();
 auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>();
 
 std::shared_ptr<StatusClient> client;
@@ -53,9 +50,8 @@ void updateClient() {
         std::string message = "Request failed - " + std::string(buffer);
         messageManager.setMessage(message);
     } else if (resp != 304) {
-        auto update = parse_json(client->getStream());
-        config->update(update.stages);
-        lights.update(config.get());
+        auto update = client->parse_json();
+        lights.update(update.lights);
         messageManager.setMessages(update.messages);
     }
 }

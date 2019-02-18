@@ -7,13 +7,22 @@
 
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
+#include "led.h"
+
+using Messages = std::vector<std::string>;
+
+typedef struct {
+    Lights lights;
+    Messages messages;
+} Updates;
 
 class StatusClient {
 public:
     StatusClient(std::string url, std::string fingerprint, std::string authorization): url(std::move(url)), fingerprint(std::move(fingerprint)), authorization(std::move(authorization)) {}
 
     int get();
-    WiFiClient& getStream();
+    
+    Updates parse_json();
 private:
     std::string url;
     std::string fingerprint;
