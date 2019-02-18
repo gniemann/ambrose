@@ -12,6 +12,8 @@
 #include "setup_server.h"
 #include "SettingsManager.h"
 #include "MessageManager.h"
+#include <Ticker.h>
+#include <Wire.h>
 
 const char* status_url = "https://devops-status-monitor.herokuapp.com/api/status";
 const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
@@ -31,6 +33,35 @@ auto config = std::make_shared<Configuration>();
 auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>();
 
 std::shared_ptr<StatusClient> client;
+MessageManager<6> messageManager;
+
+void eventLoop() {
+    lights.setLights();
+    lights.step();
+    messageManager.writeOut();
+    messageManager.step();
+}
+
+void updateClient() {
+    auto resp = client->get();
+
+    Serial.println(resp);
+    if (resp < 200 || resp >= 400) {
+        lights.failure();
+        char buffer[10];
+        sprintf(buffer, "%d", resp);
+        std::string message = "Request failed - " + std::string(buffer);
+        messageManager.setMessage(message);
+    } else if (resp != 304) {
+        auto update = parse_json(client->getStream());
+        config->update(update.stages);
+        lights.update(config.get());
+        messageManager.setMessages(update.messages);
+    }
+}
+
+Ticker clientTicker(updateClient, 1000 * 60, 0, MILLIS);
+Ticker eventLoopTicker(eventLoop, 1000 / RATE, 0, MILLIS);
 
 void setupWifi(const std::string &ssid, const std::string &password) {
     WiFi.begin(ssid.c_str(), password.c_str());
@@ -47,7 +78,6 @@ void setupWifi(const std::string &ssid, const std::string &password) {
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 }
-MessageManager<6, D2, D1> messageManager;
 
 // the setup function runs once when you press reset or power the board
 void setup() {
@@ -56,6 +86,7 @@ void setup() {
     pinMode(DATA, OUTPUT);
     pinMode(CLOCK, OUTPUT);
     pinMode(LATCH, OUTPUT);
+    Wire.begin(SDA, SCL);
 
     // turn all LEDs off
     lights.off();
@@ -70,37 +101,25 @@ void setup() {
         settingsManager.remoteSetup();
     }
 
-    setupWifi(settingsManager.getSSID(), settingsManager.getWiFiPassword());
+    auto ssid = settingsManager.getSSID();
+    messageManager.setMessage("Connecting to " + ssid + "...", false);
+    messageManager.writeOut();
+
+    setupWifi(ssid, settingsManager.getWiFiPassword());
+
+    messageManager.setMessage("Contacting to service", false);
+    messageManager.writeOut();
 
     client = std::make_shared<StatusClient>(status_url, fingerprint, settingsManager.getAuthorization());
 
     digitalWrite(LED_BUILTIN, LOW);
+    updateClient();
+
+    clientTicker.start();
+    eventLoopTicker.start();
 }
 
-constexpr int iterations = RATE * 60;
-// the loop function runs over and over again forever
 void loop() {
-    auto resp = client->get();
-
-    Serial.println(resp);
-    if (resp < 200 || resp >= 400) {
-        lights.failure();
-        char buffer[10];
-        sprintf(buffer, "%d", resp);
-        std::string message = "Request failed - " + std::string(buffer);
-        messageManager.setMessage(message);
-    } else if (resp != 304) {
-        auto update = parse_json(client->getStream());
-        config->update(update.stages);
-        lights.update(config.get());
-        messageManager.setMessages(update.messages);
-    }
-
-    for (int step = 0; step < iterations; ++step) {
-        lights.setLights();
-        lights.step();
-        messageManager.writeOut();
-        messageManager.step();
-        delay(1000 / RATE);
-    }
+    clientTicker.update();
+    eventLoopTicker.update();
 }
