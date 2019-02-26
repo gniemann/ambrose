@@ -57,8 +57,6 @@ void updateClient() {
 Ticker clientTicker(updateClient, 1000 * 60, 0, MILLIS);
 Ticker eventLoopTicker(eventLoop, 1000 / RATE, 0, MILLIS);
 
-DialIndicator<D4, D3, D2, D1> dialIndicator;
-
 void setupWifi(const std::string &ssid, const std::string &password) {
     WiFi.begin(ssid.c_str(), password.c_str());
     Serial.print("Connecting");
@@ -84,47 +82,38 @@ void setup() {
     pinMode(LATCH, OUTPUT);
     Wire.begin(SDA, SCL);
 
-    pinMode(D1, OUTPUT);
-    pinMode(D2, OUTPUT);
-    pinMode(D3, OUTPUT);
-    pinMode(D4, OUTPUT);
     // turn all LEDs off
-//    lights.off();
-//    messageManager.clear();
-//
-//    digitalWrite(LED_BUILTIN, HIGH);
-//
-//    Serial.begin(115200);
-//
-//    SettingsManager settingsManager;
-//    if (!settingsManager.checkForSettings()) {
-//        settingsManager.remoteSetup();
-//    }
-//
-//    auto ssid = settingsManager.getSSID();
-//    messageManager.setMessage("Connecting to " + ssid + "...", false);
-//    messageManager.writeOut();
-//
-//    setupWifi(ssid, settingsManager.getWiFiPassword());
-//
-//    messageManager.setMessage("Contacting to service", false);
-//    messageManager.writeOut();
-//
-//    client = std::make_shared<StatusClient>(status_url, fingerprint, settingsManager.getAuthorization());
-//
-//    digitalWrite(LED_BUILTIN, LOW);
-//    updateClient();
-//
-//    clientTicker.start();
-//    eventLoopTicker.start();
+    lights.off();
+    messageManager.clear();
+
+    digitalWrite(LED_BUILTIN, HIGH);
+
+    Serial.begin(115200);
+
+    SettingsManager settingsManager;
+    if (!settingsManager.checkForSettings()) {
+        settingsManager.remoteSetup();
+    }
+
+    auto ssid = settingsManager.getSSID();
+    messageManager.setMessage("Connecting to " + ssid + "...", false);
+    messageManager.writeOut();
+
+    setupWifi(ssid, settingsManager.getWiFiPassword());
+
+    messageManager.setMessage("Contacting to service", false);
+    messageManager.writeOut();
+
+    client = std::make_shared<StatusClient>(status_url, fingerprint, settingsManager.getAuthorization());
+
+    digitalWrite(LED_BUILTIN, LOW);
+    updateClient();
+
+    clientTicker.start();
+    eventLoopTicker.start();
 }
 
 void loop() {
-//    clientTicker.update();
-//    eventLoopTicker.update();
-
-    dialIndicator.setPercent(360);
-    delay(500);
-    dialIndicator.setPercent(-360);
-    delay(500);
+    clientTicker.update();
+    eventLoopTicker.update();
 }
