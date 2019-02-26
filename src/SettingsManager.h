@@ -15,6 +15,8 @@ public:
 
     void remoteSetup();
 
+    void reset();
+
     std::string getSSID() const { return ssid; }
     std::string getWiFiPassword() const { return wifiPassword; }
     std::string getAuthorization() const { return authorization; }

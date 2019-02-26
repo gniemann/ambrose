@@ -121,3 +121,9 @@ void SettingsManager::remoteSetup() {
     authFile.write((const uint8_t*)authorization.c_str(), authorization.size());
     authFile.close();
 }
+
+void SettingsManager::reset() {
+    SPIFFS.remove(ssidFilename);
+    SPIFFS.remove(wifiPasswordFilename);
+    SPIFFS.remove(authFilename);
+}

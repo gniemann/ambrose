@@ -11,6 +11,7 @@
 #include "SettingsManager.h"
 #include "MessageManager.h"
 #include "DialIndicator.h"
+#include "ResetButton.h"
 #include <Ticker.h>
 #include <Wire.h>
 #include <Stepper.h>
@@ -33,16 +34,41 @@ auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>();
 
 std::shared_ptr<StatusClient> client;
 MessageManager<6> messageManager;
+SettingsManager settingsManager;
+
+void reset() {
+    Serial.println("Resetting...");
+    settingsManager.reset();
+    ESP.restart();
+}
+
+void resetButtonPushed(long long duration) {
+    if (duration > 6000) {
+        digitalWrite(LED_BUILTIN, HIGH);
+        reset();
+    } else if (duration > 3000) {
+        digitalWrite(LED_BUILTIN, LOW);
+    }
+}
+
+void resetButtonReleased() {
+    digitalWrite(LED_BUILTIN, HIGH);
+}
+
+ResetButton<D3> resetButton(resetButtonPushed, resetButtonReleased);
 
 void eventLoop() {
     lights.setLights();
     lights.step();
     messageManager.writeOut();
     messageManager.step();
+    resetButton.step();
 }
 
 void updateClient() {
+    digitalWrite(LED_BUILTIN, LOW);
     auto resp = client->get();
+    digitalWrite(LED_BUILTIN, HIGH);
 
     Serial.println(resp);
     if (resp < 200 || resp >= 400) {
@@ -77,9 +103,6 @@ void setupWifi(const std::string &ssid, const std::string &password) {
 void setup() {
     // initialize digital pin LED_BUILTIN as an output.
     pinMode(LED_BUILTIN, OUTPUT);
-    pinMode(DATA, OUTPUT);
-    pinMode(CLOCK, OUTPUT);
-    pinMode(LATCH, OUTPUT);
     Wire.begin(SDA, SCL);
 
     // turn all LEDs off
@@ -90,7 +113,6 @@ void setup() {
 
     Serial.begin(115200);
 
-    SettingsManager settingsManager;
     if (!settingsManager.checkForSettings()) {
         settingsManager.remoteSetup();
     }

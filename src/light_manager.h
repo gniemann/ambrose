@@ -15,7 +15,7 @@ using Pin = uint8_t;
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
 class LightManager {
 public:
-    LightManager(): isNormalOperation(true) {}
+    LightManager();
     void off();
     void failure();
     void update(const Lights &newLights);
@@ -44,6 +44,13 @@ uint8_t colorToByte(const Color &c) {
     }
 
     return output;
+}
+
+template<Pin DATA, Pin CLOCK, Pin LATCH, size_t N>
+LightManager<DATA, CLOCK, LATCH, N>::LightManager(): isNormalOperation(true) {
+    pinMode(DATA, OUTPUT);
+    pinMode(CLOCK, OUTPUT);
+    pinMode(LATCH, OUTPUT);
 }
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
