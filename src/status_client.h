@@ -21,7 +21,8 @@ public:
     StatusClient(std::string url, std::string fingerprint, std::string authorization): url(std::move(url)), fingerprint(std::move(fingerprint)), authorization(std::move(authorization)) {}
 
     int get();
-    
+    std::string error(int code) const;
+
     Updates parse_json();
 private:
     std::string url;

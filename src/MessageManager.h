@@ -45,6 +45,13 @@ private:
     MessageState state;
 };
 
+std::string uppercase(const std::string &str) {
+    std::string retVal(str.length(), ' ');
+
+    std::transform(str.cbegin(), str.cend(), retVal.begin(), [](char c) { return toupper(c); });
+    return retVal;
+}
+
 template <size_t NumSegments>
 MessageManager<NumSegments>::MessageManager(): position(0), steps(0), pauseSteps(0), state(MessageState::Stopped) {
     for (int i = 0; i < NumSegments; i++) {
@@ -57,17 +64,19 @@ MessageManager<NumSegments>::MessageManager(): position(0), steps(0), pauseSteps
 
 template <size_t NumSegments>
 void MessageManager<NumSegments>::setMessage(const std::string msg, bool scrollIn) {
-    messages.clear();
-    messages.push_back(msg);
+    auto newMsg = uppercase(msg);
 
-    setCurrentMessage(msg, scrollIn);
+    messages.clear();
+    messages.push_back(newMsg);
+
+    setCurrentMessage(newMsg, scrollIn);
 }
 
 template<size_t NumSegments>
 void MessageManager<NumSegments>::setMessages(const Messages &newMessages) {
     messages.clear();
     for (const auto& msg: newMessages) {
-        messages.push_back(msg);
+        messages.push_back(uppercase(msg));
     }
 }
 
@@ -149,6 +158,7 @@ void MessageManager<NumSegments>::next() {
 template<size_t NumSegments>
 void MessageManager<NumSegments>::setCurrentMessage(const std::string &message, bool scrollIn) {
     currentMessage = message;
+
     if (scrollIn) {
         state = MessageState::ScrollOut;
         position = 0;

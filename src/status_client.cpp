@@ -11,7 +11,7 @@ const char *ETAG = "ETag";
 const char *IF_NONE_MATCH = "If-None-Match";
 const char *AUTHORIZATION = "Authorization";
 
-const size_t capacity = JSON_ARRAY_SIZE(2) + JSON_ARRAY_SIZE(9) + 10*JSON_OBJECT_SIZE(2) + 9*JSON_OBJECT_SIZE(3) + 1000;
+const size_t capacity = JSON_ARRAY_SIZE(2) + JSON_ARRAY_SIZE(9) + 6*JSON_OBJECT_SIZE(2) + 13*JSON_OBJECT_SIZE(3) + 4*JSON_OBJECT_SIZE(6) + 1000;
 
 int StatusClient::get() {
     client.end();
@@ -68,5 +68,25 @@ Updates StatusClient::parse_json() {
     }
 
     return updates;
+}
+
+std::string StatusClient::error(int code) const {
+    switch (code) {
+        case HTTPC_ERROR_READ_TIMEOUT:
+            return "Request timed out";
+        case HTTP_CODE_BAD_REQUEST:
+            return "Request failed due to Bad Request error";
+        case HTTP_CODE_UNAUTHORIZED:
+            return "Request returned Unauthorized - check credentials";
+        case HTTP_CODE_FORBIDDEN:
+            return "Request returned Forbidden - check credentials";
+        case HTTP_CODE_INTERNAL_SERVER_ERROR:
+            return "Request failed due to server error";
+
+        default:
+            char buffer[10];
+            sprintf(buffer, "%d", code);
+            return "Request failed - " + std::string(buffer);
+    }
 }
 
