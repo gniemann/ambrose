@@ -9,13 +9,13 @@
 #include <functional>
 
 template <uint8_t pin>
-class ResetButton {
+class ResetButton: Manager {
 public:
     using PushedFunction = std::function<void(long long)>;
     using ReleasedFunction = std::function<void()>;
     ResetButton(PushedFunction pushed, ReleasedFunction released);
 
-    void step();
+    void run() override;
 private:
     bool isDepressed = false;
     long long startMillis = 0;
@@ -29,7 +29,7 @@ ResetButton<pin>::ResetButton(PushedFunction pushed, ReleasedFunction released):
 }
 
 template<uint8_t pin>
-void ResetButton<pin>::step() {
+void ResetButton<pin>::run() {
     if (digitalRead(pin) == LOW) {
         auto current = millis();
         if (!isDepressed) {

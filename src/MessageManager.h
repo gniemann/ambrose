@@ -10,6 +10,7 @@
 #include <deque>
 #include <Adafruit_LEDBackpack.h>
 #include <algorithm>
+#include "Manager.h"
 
 enum class MessageState {
     Stopped,
@@ -19,7 +20,7 @@ enum class MessageState {
 };
 
 template <size_t NumSegments>
-class MessageManager {
+class MessageManager: Manager {
 public:
     MessageManager();
 
@@ -28,7 +29,7 @@ public:
     void setMessages(const Messages &newMessages);
 
     void writeOut();
-    void step();
+    void run() override;
     void clear();
 private:
     void next();
@@ -98,7 +99,7 @@ void MessageManager<NumSegments>::clear() {
 }
 
 template <size_t NumSegments>
-void MessageManager<NumSegments>::step() {
+void MessageManager<NumSegments>::run() {
     switch (state) {
         case MessageState::Paused:
             if (++pauseSteps > 10) {
@@ -138,6 +139,7 @@ void MessageManager<NumSegments>::step() {
         default:
             break;
     }
+    writeOut();
 }
 
 template <size_t NumSegments>

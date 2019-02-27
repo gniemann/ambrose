@@ -8,7 +8,7 @@
 
 SetupServer::SetupServer(): hasCompleted(false) {
 
-    server.serveStatic("/bootstrap.min.css", SPIFFS, "/bootstrap.min.css");
+    server.serveStatic("/bootstrap.min.css", SPIFFS, "/bootstrap.min.css", "maxage=86400");
     server.serveStatic("/", SPIFFS, "/setup.html");
     server.on("/settings", HTTP_POST, [this]() { this->handleSettings(); } );
 }

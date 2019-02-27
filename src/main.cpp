@@ -6,7 +6,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include "status_client.h"
-#include "light_manager.h"
+#include "LightManager.h"
 #include "setup_server.h"
 #include "SettingsManager.h"
 #include "MessageManager.h"
@@ -31,9 +31,15 @@ const Pin LATCH = D7;
 
 const Hz RATE = 5;
 
-auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>();
+using ManagerPtr = std::shared_ptr<Manager>;
+using Managers = std::vector<ManagerPtr>;
+Managers managers;
+
+using Tickers = std::vector<Ticker>;
+Tickers tickers;
 
 std::shared_ptr<StatusClient> client;
+auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>();
 MessageManager<6> messageManager;
 SettingsManager settingsManager(SPIFFS);
 
@@ -61,11 +67,9 @@ void resetButtonReleased() {
 ResetButton<D3> resetButton(resetButtonPushed, resetButtonReleased);
 
 void eventLoop() {
-    lights.setLights();
-    lights.step();
-    messageManager.writeOut();
-    messageManager.step();
-    resetButton.step();
+    lights.run();
+    messageManager.run();
+    resetButton.run();
 }
 
 void updateClient() {
@@ -82,9 +86,6 @@ void updateClient() {
         messageManager.setMessages(update.messages);
     }
 }
-
-Ticker clientTicker(updateClient, 1000 * 60, 0, MILLIS);
-Ticker eventLoopTicker(eventLoop, 1000 / RATE, 0, MILLIS);
 
 void setupWifi(const std::string &ssid, const std::string &password) {
     WiFi.setAutoConnect(false);
@@ -114,6 +115,8 @@ void setup() {
     Wire.begin(SDA, SCL);
     SPIFFS.begin();
 
+    // set up managers
+
     // turn all LEDs off
     lights.off();
     messageManager.clear();
@@ -140,11 +143,16 @@ void setup() {
     digitalWrite(LED_BUILTIN, LOW);
     updateClient();
 
-    clientTicker.start();
-    eventLoopTicker.start();
+    tickers.emplace_back(updateClient, 1000 * 60, 0, MILLIS);
+    tickers.emplace_back(eventLoop, 1000 / RATE, 0, MILLIS);
+
+    for (auto& ticker: tickers) {
+        ticker.start();
+    }
 }
 
 void loop() {
-    clientTicker.update();
-    eventLoopTicker.update();
+    for (auto& ticker: tickers) {
+        ticker.update();
+    }
 }

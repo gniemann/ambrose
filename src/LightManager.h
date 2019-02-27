@@ -9,18 +9,19 @@
 #include <array>
 #include <algorithm>
 #include "led.h"
+#include "Manager.h"
 
 using Pin = uint8_t;
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
-class LightManager {
+class LightManager: Manager {
 public:
     LightManager();
     void off();
     void failure();
     void update(const Lights &newLights);
     void setLights() const;
-    void step();
+    void run() override;
 private:
     bool isNormalOperation;
     std::array<LEDPtr, N> lights;
@@ -108,10 +109,11 @@ void LightManager<DATA, CLOCK, LATCH, N>::setLights() const {
 }
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
-void LightManager<DATA, CLOCK, LATCH, N>::step() {
+void LightManager<DATA, CLOCK, LATCH, N>::run() {
     for (auto light: lights) {
         light->step();
     }
+    setLights();
 }
 
 #endif //BUILD_MONITOR_LIGHTMANAGER_H
