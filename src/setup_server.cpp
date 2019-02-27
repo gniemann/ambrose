@@ -4,8 +4,12 @@
 
 #include "setup_server.h"
 #include <ArduinoJson.h>
+#include <FS.h>
 
 SetupServer::SetupServer(): hasCompleted(false) {
+
+    server.serveStatic("/bootstrap.min.css", SPIFFS, "/bootstrap.min.css");
+    server.serveStatic("/", SPIFFS, "/setup.html");
     server.on("/settings", HTTP_POST, [this]() { this->handleSettings(); } );
 }
 
@@ -21,11 +25,14 @@ void SetupServer::waitForSettings() {
 }
 
 void SetupServer::handleSettings() {
+    Serial.println("Received settings POST");
     settings.ssid = server.arg("ssid").c_str();
-    settings.wifiPassword = server.arg("password").c_str();
+    settings.wifiPassword = server.arg("wifi-password").c_str();
     settings.username = server.arg("username").c_str();
-    settings.token = server.arg("token").c_str();
+    settings.token = server.arg("password").c_str();
 
-    server.send(200, "plain/text", "OK");
+    File file = SPIFFS.open("/success.html", "r");
+    server.streamFile(file, "text/html");
+    file.close();
     hasCompleted = true;
 }

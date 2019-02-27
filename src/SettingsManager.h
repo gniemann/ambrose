@@ -8,9 +8,6 @@
 
 class SettingsManager {
 public:
-    SettingsManager();
-    ~SettingsManager();
-
     bool checkForSettings();
 
     void remoteSetup();

@@ -40,9 +40,6 @@ Updates StatusClient::parse_json() {
     auto& stream = client.getStream();
 
     DynamicJsonBuffer jsonBuffer(capacity);
-    Serial.print("Buffer is ");
-    Serial.print(jsonBuffer.size());
-    Serial.println(" bytes");
 
     JsonObject& root = jsonBuffer.parseObject(stream);
     if (!root.success()) {

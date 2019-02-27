@@ -54,14 +54,6 @@ std::string base64_encode(char const* bytes_to_encode, unsigned int in_len) {
 
 }
 
-SettingsManager::SettingsManager() {
-    SPIFFS.begin();
-}
-
-SettingsManager::~SettingsManager() {
-    SPIFFS.end();
-}
-
 bool SettingsManager::checkForSettings() {
     if (SPIFFS.exists(ssidFilename) && SPIFFS.exists(wifiPasswordFilename) && SPIFFS.exists(authFilename)) {
         auto SSIDFile = SPIFFS.open(ssidFilename, "r");
@@ -92,9 +84,10 @@ bool SettingsManager::checkForSettings() {
 }
 
 void SettingsManager::remoteSetup() {
+    WiFi.mode(WIFI_AP);
     WiFi.softAP("devops_monitor_ap");
     Serial.print("IP address: ");
-    Serial.print(WiFi.softAPIP());
+    Serial.println(WiFi.softAPIP());
     SetupServer srv;
     Serial.println("Waiting for settings");
     srv.waitForSettings();
@@ -123,7 +116,11 @@ void SettingsManager::remoteSetup() {
 }
 
 void SettingsManager::reset() {
-    SPIFFS.remove(ssidFilename);
-    SPIFFS.remove(wifiPasswordFilename);
-    SPIFFS.remove(authFilename);
+    if (!SPIFFS.remove(ssidFilename) ||
+        !SPIFFS.remove(wifiPasswordFilename) ||
+        !SPIFFS.remove(authFilename)) {
+        Serial.println("Reset failed!");
+    } else {
+        Serial.println("Reset successful.");
+    }
 }
