@@ -18,7 +18,7 @@ typedef struct {
 
 class StatusClient {
 public:
-    StatusClient(std::string url, std::string fingerprint, std::string authorization): url(std::move(url)), fingerprint(std::move(fingerprint)), authorization(std::move(authorization)) {}
+    StatusClient(std::string url, std::string fingerprint, std::string auth);
 
     int get();
     std::string error(int code) const;

@@ -35,7 +35,7 @@ auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>();
 
 std::shared_ptr<StatusClient> client;
 MessageManager<6> messageManager;
-SettingsManager settingsManager;
+SettingsManager settingsManager(SPIFFS);
 
 void reset() {
     Serial.println("Resetting...");

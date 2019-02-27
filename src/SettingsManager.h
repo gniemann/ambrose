@@ -5,9 +5,13 @@
 #ifndef BUILD_MONITOR_SETTINGSMANAGER_H
 #define BUILD_MONITOR_SETTINGSMANAGER_H
 
+namespace fs {
+    class FS;
+}
 
 class SettingsManager {
 public:
+    SettingsManager(fs::FS &fileSystem): fileSystem(fileSystem) {}
     bool checkForSettings();
 
     void remoteSetup();
@@ -25,6 +29,8 @@ private:
     std::string ssid;
     std::string wifiPassword;
     std::string authorization;
+    
+    fs::FS &fileSystem;
 };
 
 

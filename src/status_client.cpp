@@ -6,6 +6,7 @@
 #include <string>
 #include "status_client.h"
 #include <ArduinoJson.h>
+#include <base64.h>
 
 const char *ETAG = "ETag";
 const char *IF_NONE_MATCH = "If-None-Match";
@@ -85,5 +86,10 @@ std::string StatusClient::error(int code) const {
             sprintf(buffer, "%d", code);
             return "Request failed - " + std::string(buffer);
     }
+}
+
+StatusClient::StatusClient(std::string url, std::string fingerprint, std::string auth) : url(std::move(url)), fingerprint(std::move(fingerprint)) {
+    authorization = base64::encode(auth.c_str()).c_str();
+    authorization = "Basic " + authorization;
 }
 
