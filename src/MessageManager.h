@@ -7,7 +7,6 @@
 
 #include <string>
 #include <array>
-#include <deque>
 #include <Adafruit_LEDBackpack.h>
 #include <algorithm>
 #include "Manager.h"
@@ -39,7 +38,8 @@ private:
     std::array<Adafruit_AlphaNum4, NumSegments> segments;
     std::array<char, numCharacters> buffer;
     std::string currentMessage;
-    std::deque<std::string> messages;
+    std::vector<std::string> messages;
+    size_t messageIndex;
     size_t position;
     int steps;
     int pauseSteps;
@@ -54,7 +54,7 @@ std::string uppercase(const std::string &str) {
 }
 
 template <size_t NumSegments>
-MessageManager<NumSegments>::MessageManager(): position(0), steps(0), pauseSteps(0), state(MessageState::Stopped) {
+MessageManager<NumSegments>::MessageManager():  messageIndex(0), position(0), steps(0), pauseSteps(0), state(MessageState::Stopped) {
     for (int i = 0; i < NumSegments; i++) {
         segments[i] = Adafruit_AlphaNum4();
         segments[i].begin(0x70 + i);
@@ -69,15 +69,27 @@ void MessageManager<NumSegments>::setMessage(const std::string msg, bool scrollI
 
     messages.clear();
     messages.push_back(newMsg);
+    messageIndex = 0;
 
     setCurrentMessage(newMsg, scrollIn);
 }
 
 template<size_t NumSegments>
 void MessageManager<NumSegments>::setMessages(const Messages &newMessages) {
+    // don't replace the current messages if the new messages are the same
+    if (messages.size() == newMessages.size() && std::equal(messages.begin(), messages.end(), newMessages.begin())) {
+        return;
+    }
+
     messages.clear();
     for (const auto& msg: newMessages) {
         messages.push_back(uppercase(msg));
+    }
+
+    messageIndex = 0;
+
+    if (currentMessage.empty()) {
+        setCurrentMessage(messages.front(), true);
     }
 }
 
@@ -150,11 +162,9 @@ void MessageManager<NumSegments>::next() {
         return;
     }
 
-    auto msg = messages.front();
-    messages.pop_front();
-    messages.push_back(msg);
+    messageIndex = (messageIndex + 1) % messages.size();
 
-    setCurrentMessage(msg, true);
+    setCurrentMessage(messages[messageIndex], true);
 }
 
 template<size_t NumSegments>

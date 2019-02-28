@@ -3,11 +3,11 @@
 //
 
 #include <ESP8266WiFi.h>
-#include "SettingsManager.h"
+#include "SetupManager.h"
 #include "setup_server.h"
 #include <FS.h>
 
-bool SettingsManager::checkForSettings() {
+bool SetupManager::checkFSForSettings() {
     if (fileSystem.exists(ssidFilename) && fileSystem.exists(wifiPasswordFilename) && fileSystem.exists(authFilename)) {
         auto SSIDFile = fileSystem.open(ssidFilename, "r");
         if (!SSIDFile) {
@@ -36,17 +36,31 @@ bool SettingsManager::checkForSettings() {
     return false;
 }
 
-void SettingsManager::remoteSetup() {
+bool SetupManager::checkForSettings() {
+    return hasSettings;
+}
+
+void SetupManager::remoteSetup() {
     WiFi.mode(WIFI_AP);
     WiFi.softAP("devops_monitor_ap");
     Serial.print("IP address: ");
     Serial.println(WiFi.softAPIP());
-    SetupServer srv;
+    srv = std::unique_ptr<SetupServer>(new SetupServer([this](Settings s) { this->receiveSettings(s); }));
     Serial.println("Waiting for settings");
-    srv.waitForSettings();
+}
 
+void SetupManager::reset() {
+    if (!fileSystem.remove(ssidFilename) ||
+        !fileSystem.remove(wifiPasswordFilename) ||
+        !fileSystem.remove(authFilename)) {
+        Serial.println("Reset failed!");
+    } else {
+        Serial.println("Reset successful.");
+    }
+}
+
+void SetupManager::receiveSettings(Settings settings) {
     WiFi.softAPdisconnect(true);
-    auto settings = srv.getSettings();
     Serial.println("Received settings");
 
     ssid = settings.ssid;
@@ -65,14 +79,16 @@ void SettingsManager::remoteSetup() {
     auto authFile = fileSystem.open(authFilename, "w");
     authFile.write((const uint8_t*)authorization.c_str(), authorization.size());
     authFile.close();
+
+    hasSettings = true;
 }
 
-void SettingsManager::reset() {
-    if (!fileSystem.remove(ssidFilename) ||
-        !fileSystem.remove(wifiPasswordFilename) ||
-        !fileSystem.remove(authFilename)) {
-        Serial.println("Reset failed!");
-    } else {
-        Serial.println("Reset successful.");
-    }
+void SetupManager::run() {
+    srv->handleClients();
 }
+
+void SetupManager::init() {
+    hasSettings = checkFSForSettings();
+}
+
+SetupManager::SetupManager(fs::FS &fileSystem) : fileSystem(fileSystem) {}

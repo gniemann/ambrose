@@ -7,6 +7,7 @@
 
 
 #include <ESP8266WebServer.h>
+#include <functional>
 
 typedef struct {
     std::string ssid;
@@ -17,16 +18,16 @@ typedef struct {
 
 class SetupServer {
 public:
-    SetupServer();
-    void waitForSettings();
+    using OnSettingsReceived = std::function<void(Settings)>;
 
-    Settings getSettings() const { return settings; }
+    SetupServer(OnSettingsReceived onSettingsReceived);
+
+    void handleClients();
 private:
     void handleSettings();
     ESP8266WebServer server;
-
-    Settings settings;
     bool hasCompleted;
+    OnSettingsReceived onSettingsReceived;
 };
 
 

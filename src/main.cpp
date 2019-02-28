@@ -8,7 +8,7 @@
 #include "status_client.h"
 #include "LightManager.h"
 #include "setup_server.h"
-#include "SettingsManager.h"
+#include "SetupManager.h"
 #include "MessageManager.h"
 #include "DialIndicator.h"
 #include "ResetButton.h"
@@ -16,6 +16,7 @@
 #include <Wire.h>
 #include <Stepper.h>
 #include <FS.h>
+#include <algorithm>
 
 const char* status_url = "https://devops-status-monitor.herokuapp.com/api/status";
 const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
@@ -28,12 +29,9 @@ constexpr std::size_t ledCNT = 9;
 const Pin DATA = D5;
 const Pin CLOCK = D6;
 const Pin LATCH = D7;
+const Pin RESET = D3;
 
 const Hz RATE = 5;
-
-using ManagerPtr = std::shared_ptr<Manager>;
-using Managers = std::vector<ManagerPtr>;
-Managers managers;
 
 using Tickers = std::vector<Ticker>;
 Tickers tickers;
@@ -41,11 +39,11 @@ Tickers tickers;
 std::shared_ptr<StatusClient> client;
 auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>();
 MessageManager<6> messageManager;
-SettingsManager settingsManager(SPIFFS);
+SetupManager setupManager(SPIFFS);
 
 void reset() {
     Serial.println("Resetting...");
-    settingsManager.reset();
+    setupManager.reset();
     WiFi.disconnect();
     WiFi.setAutoConnect(false);
     ESP.restart();
@@ -64,7 +62,7 @@ void resetButtonReleased() {
     digitalWrite(LED_BUILTIN, HIGH);
 }
 
-ResetButton<D3> resetButton(resetButtonPushed, resetButtonReleased);
+ResetButton<RESET> resetButton(resetButtonPushed, resetButtonReleased);
 
 void eventLoop() {
     lights.run();
@@ -87,18 +85,27 @@ void updateClient() {
     }
 }
 
-void setupWifi(const std::string &ssid, const std::string &password) {
+void setupWifi() {
+    digitalWrite(LED_BUILTIN, LOW);
+    auto ssid = setupManager.getSSID();
+    auto password = setupManager.getWiFiPassword();
     WiFi.setAutoConnect(false);
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid.c_str(), password.c_str());
-    Serial.print("Connecting to ");
-    Serial.println(ssid.c_str());
+    auto connectionMsg = "Connecting to " + ssid + "...";
+    Serial.println(connectionMsg.c_str());
+
+    messageManager.setMessage(connectionMsg, false);
+    messageManager.writeOut();
 
     // Wait for connection
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
     }
+    messageManager.setMessage("Connected", false);
+    messageManager.writeOut();
+
     Serial.println("");
     Serial.print("Connected to ");
     Serial.println(ssid.c_str());
@@ -106,7 +113,30 @@ void setupWifi(const std::string &ssid, const std::string &password) {
     Serial.println(WiFi.localIP());
     WiFi.setAutoReconnect(true);
     WiFi.setAutoConnect(true);
+    digitalWrite(LED_BUILTIN, HIGH);
 }
+
+void onWifiConnected() {
+    client = std::make_shared<StatusClient>(status_url, fingerprint, setupManager.getAuthorization());
+    updateClient();
+
+    tickers.emplace_back(updateClient, 1000 * 60, 0, MILLIS);
+}
+
+void checkForSettings() {
+    if (!setupManager.checkForSettings()) {
+        setupManager.run();
+        return;
+    }
+    // received the settings. Stop the ticker and start the wifi
+    setupWifi();
+    tickers.clear();
+    onWifiConnected();
+
+    tickers.emplace_back(eventLoop, 1000/RATE, 0, MILLIS);
+    std::for_each(tickers.begin(), tickers.end(), [](Ticker &t) { t.start(); });
+}
+
 
 // the setup function runs once when you press reset or power the board
 void setup() {
@@ -114,45 +144,33 @@ void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
     Wire.begin(SDA, SCL);
     SPIFFS.begin();
-
-    // set up managers
+    Serial.begin(115200);
+    setupManager.init();
 
     // turn all LEDs off
     lights.off();
     messageManager.clear();
 
-    digitalWrite(LED_BUILTIN, HIGH);
+    if (!setupManager.checkForSettings()) {
+        std::vector<std::string> messages = {
+                "Setup required",
+                "Connect to devops_monitor_ap WiFi network",
+                "Navigate to http://192.168.4.1",
+                "Follow instructions to complete setup",
+            };
+        messageManager.setMessages(messages);
+        setupManager.remoteSetup();
 
-    Serial.begin(115200);
-
-    if (!settingsManager.checkForSettings()) {
-        settingsManager.remoteSetup();
+        tickers.emplace_back(checkForSettings, 1000 / RATE, 0, MILLIS);
+    } else {
+        setupWifi();
+        onWifiConnected();
     }
 
-    auto ssid = settingsManager.getSSID();
-    messageManager.setMessage("Connecting to " + ssid + "...", false);
-    messageManager.writeOut();
-
-    setupWifi(ssid, settingsManager.getWiFiPassword());
-
-    messageManager.setMessage("Contacting to service", false);
-    messageManager.writeOut();
-
-    client = std::make_shared<StatusClient>(status_url, fingerprint, settingsManager.getAuthorization());
-
-    digitalWrite(LED_BUILTIN, LOW);
-    updateClient();
-
-    tickers.emplace_back(updateClient, 1000 * 60, 0, MILLIS);
-    tickers.emplace_back(eventLoop, 1000 / RATE, 0, MILLIS);
-
-    for (auto& ticker: tickers) {
-        ticker.start();
-    }
+    tickers.emplace_back(eventLoop, 1000/RATE, 0, MILLIS);
+    std::for_each(tickers.begin(), tickers.end(), [](Ticker &t) { t.start(); });
 }
 
 void loop() {
-    for (auto& ticker: tickers) {
-        ticker.update();
-    }
+    std::for_each(tickers.begin(), tickers.end(), [](Ticker &t) { t.update(); });
 }
