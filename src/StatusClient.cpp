@@ -2,11 +2,16 @@
 // Created by Greg Niemann on 11/4/18.
 //
 
-#include <Arduino.h>
 #include <string>
-#include "status_client.h"
+
+#include <Arduino.h>
 #include <ArduinoJson.h>
 #include <base64.h>
+#include <ArduinoLog.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClient.h>
+
+#include "StatusClient.h"
 
 const char *ETAG = "ETag";
 const char *IF_NONE_MATCH = "If-None-Match";
@@ -44,7 +49,7 @@ Updates StatusClient::parse_json() {
 
     JsonObject& root = jsonBuffer.parseObject(stream);
     if (!root.success()) {
-        Serial.println("Parsing json failed");
+        log.error("Parsing json failed");
         return updates;
     }
 
@@ -53,7 +58,7 @@ Updates StatusClient::parse_json() {
     if (lights.success()) {
         updates.lights = lightsFromJSONArray(lights);
     } else {
-        Serial.println("Parse json lights failed");
+        log.error("Parse json lights failed");
     }
 
     JsonArray& msgArr = root["messages"];
@@ -62,7 +67,7 @@ Updates StatusClient::parse_json() {
             updates.messages.emplace_back(msg);
         }
     } else {
-        Serial.println("Parse json messages failed");
+        log.error("Parse json messages failed");
     }
 
     return updates;
@@ -88,7 +93,7 @@ std::string StatusClient::error(int code) const {
     }
 }
 
-StatusClient::StatusClient(std::string url, std::string fingerprint, std::string auth) : url(std::move(url)), fingerprint(std::move(fingerprint)) {
+StatusClient::StatusClient(Logging &log, std::string url, std::string fingerprint, std::string auth) : url(std::move(url)), fingerprint(std::move(fingerprint)), log(log) {
     authorization = base64::encode(auth.c_str()).c_str();
     authorization = "Basic " + authorization;
 }

@@ -18,7 +18,6 @@ class LightManager: Manager {
 public:
     LightManager();
     void off();
-    void failure();
     void update(const Lights &newLights);
     void setLights() const;
     void run() override;
@@ -64,12 +63,6 @@ template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
 void LightManager<DATA, CLOCK, LATCH, N>::off() {
     LEDPtr off(new LED(OFF));
     setAll(off);
-}
-
-template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
-void LightManager<DATA, CLOCK, LATCH, N>::failure() {
-    LEDPtr failure(new LED(RED));
-    setAll(failure);
 }
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>

@@ -6,16 +6,18 @@
 #define BUILD_MONITOR_SETTINGSMANAGER_H
 
 
-#include "setup_server.h"
+#include "SetupServer.h"
 #include "Manager.h"
 
 namespace fs {
     class FS;
 }
 
+class Logging;
+
 class SetupManager: Manager {
 public:
-    SetupManager(fs::FS &fileSystem);
+    SetupManager(fs::FS &fileSystem, Logging &log);
     void init();
     bool checkForSettings();
 
@@ -41,6 +43,7 @@ private:
     std::string authorization;
     
     fs::FS &fileSystem;
+    Logging &log;
 
     std::unique_ptr<SetupServer> srv;
 };

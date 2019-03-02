@@ -5,8 +5,6 @@
 #ifndef BUILD_MONITOR_CLIENT_H
 #define BUILD_MONITOR_CLIENT_H
 
-#include <ESP8266HTTPClient.h>
-#include <WiFiClient.h>
 #include "led.h"
 
 using Messages = std::vector<std::string>;
@@ -16,9 +14,12 @@ typedef struct {
     Messages messages;
 } Updates;
 
+class Logging;
+class HTTPClient;
+
 class StatusClient {
 public:
-    StatusClient(std::string url, std::string fingerprint, std::string auth);
+    StatusClient(Logging &log, std::string url, std::string fingerprint, std::string auth);
 
     int get();
     std::string error(int code) const;
@@ -31,6 +32,7 @@ private:
     std::string etag;
     HTTPClient client;
 
+    Logging &log;
 };
 
 #endif //BUILD_MONITOR_CLIENT_H

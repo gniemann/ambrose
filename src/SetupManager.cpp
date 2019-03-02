@@ -3,9 +3,11 @@
 //
 
 #include <ESP8266WiFi.h>
-#include "SetupManager.h"
-#include "setup_server.h"
 #include <FS.h>
+#include <ArduinoLog.h>
+
+#include "SetupManager.h"
+#include "SetupServer.h"
 
 bool SetupManager::checkFSForSettings() {
     if (fileSystem.exists(ssidFilename) && fileSystem.exists(wifiPasswordFilename) && fileSystem.exists(authFilename)) {
@@ -43,29 +45,27 @@ bool SetupManager::checkForSettings() {
 void SetupManager::remoteSetup() {
     WiFi.mode(WIFI_AP);
     WiFi.softAP("devops_monitor_ap");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.softAPIP());
+    log.notice("IP address: %s", WiFi.softAPIP().toString().c_str());
     srv = std::unique_ptr<SetupServer>(new SetupServer([this](Settings s) { this->receiveSettings(s); }));
-    Serial.println("Waiting for settings");
+    log.trace("Waiting for settings");
 }
 
 void SetupManager::reset() {
     if (!fileSystem.remove(ssidFilename) ||
         !fileSystem.remove(wifiPasswordFilename) ||
         !fileSystem.remove(authFilename)) {
-        Serial.println("Reset failed!");
+        log.fatal("Reset failed!");
     } else {
-        Serial.println("Reset successful.");
+        log.notice("Reset successful");
     }
 }
 
 void SetupManager::receiveSettings(Settings settings) {
     WiFi.softAPdisconnect(true);
-    Serial.println("Received settings");
+    log.notice("Received settings");
 
     ssid = settings.ssid;
     wifiPassword = settings.wifiPassword;
-
     authorization = settings.username + ":" + settings.token;
 
     auto ssidFile = fileSystem.open(ssidFilename, "w");
@@ -91,4 +91,4 @@ void SetupManager::init() {
     hasSettings = checkFSForSettings();
 }
 
-SetupManager::SetupManager(fs::FS &fileSystem) : fileSystem(fileSystem) {}
+SetupManager::SetupManager(fs::FS &fileSystem, Logging &log) : fileSystem(fileSystem), log(log) {}

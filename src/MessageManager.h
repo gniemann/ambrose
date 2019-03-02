@@ -7,8 +7,11 @@
 
 #include <string>
 #include <array>
-#include <Adafruit_LEDBackpack.h>
+#include <vector>
 #include <algorithm>
+
+#include <Adafruit_LEDBackpack.h>
+
 #include "Manager.h"
 
 enum class MessageState {

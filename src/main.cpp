@@ -2,21 +2,24 @@
 // Created by Greg Niemann on 10/20/18.
 //
 
+#include <algorithm>
+
 #include <Arduino.h>
-#include <ESP8266WiFi.h>
-#include <WiFiClient.h>
-#include "status_client.h"
-#include "LightManager.h"
-#include "setup_server.h"
-#include "SetupManager.h"
-#include "MessageManager.h"
-#include "DialIndicator.h"
-#include "ResetButton.h"
+#include <ESP8266HTTPClient.h>
 #include <Ticker.h>
 #include <Wire.h>
 #include <Stepper.h>
 #include <FS.h>
-#include <algorithm>
+#include <ArduinoLog.h>
+
+#include "StatusClient.h"
+#include "LightManager.h"
+#include "SetupServer.h"
+#include "SetupManager.h"
+#include "MessageManager.h"
+#include "DialIndicator.h"
+#include "ResetButton.h"
+#include "SystemStatusIndicator.h"
 
 const char* status_url = "https://devops-status-monitor.herokuapp.com/api/status";
 const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
@@ -32,6 +35,8 @@ const Pin LATCH = D7;
 const Pin RESET = D3;
 
 const Hz RATE = 5;
+const int iterations = 1000 / RATE;
+const int MINUTE = 1000 * 60;
 
 using Tickers = std::vector<Ticker>;
 Tickers tickers;
@@ -39,10 +44,15 @@ Tickers tickers;
 std::shared_ptr<StatusClient> client;
 auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>();
 MessageManager<6> messageManager;
-SetupManager setupManager(SPIFFS);
+SetupManager setupManager(SPIFFS, Log);
+SystemStatusIndicator<D4, D0, D8> status;
+
+constexpr int secondsInMillis(int sec) {
+    return sec * 1000;
+}
 
 void reset() {
-    Serial.println("Resetting...");
+    Log.notice("Resetting");
     setupManager.reset();
     WiFi.disconnect();
     WiFi.setAutoConnect(false);
@@ -50,10 +60,10 @@ void reset() {
 }
 
 void resetButtonPushed(long long duration) {
-    if (duration > 6000) {
+    if (duration > secondsInMillis(6)) {
         digitalWrite(LED_BUILTIN, HIGH);
         reset();
-    } else if (duration > 3000) {
+    } else if (duration > secondsInMillis(3)) {
         digitalWrite(LED_BUILTIN, LOW);
     }
 }
@@ -71,56 +81,64 @@ void eventLoop() {
 }
 
 void updateClient() {
-    digitalWrite(LED_BUILTIN, LOW);
+    status.setStatus(SystemStatus::transmitting);
     auto resp = client->get();
-    digitalWrite(LED_BUILTIN, HIGH);
 
-    Serial.println(resp);
+    Log.trace("Status code %d", resp);
     if (resp < 200 || resp >= 400) {
+        status.setStatus(SystemStatus::failed);
         messageManager.setMessage(client->error(resp), false);
     } else if (resp != 304) {
+        status.setStatus(SystemStatus::idle);
         auto update = client->parse_json();
         lights.update(update.lights);
         messageManager.setMessages(update.messages);
     }
 }
 
+void onWifiConnected() {
+    client = std::make_shared<StatusClient>(Log, status_url, fingerprint, setupManager.getAuthorization());
+    updateClient();
+
+    tickers.emplace_back(updateClient, MINUTE, 0, MILLIS);
+}
+
+void checkWiFi() {
+    if (WiFi.status() != WL_CONNECTED) {
+        tickers.emplace_back(checkWiFi, 500, 1, MILLIS);
+        return;
+    }
+
+    // connected
+    status.setStatus(SystemStatus::idle);
+    messageManager.setMessage("Connected", false);
+    messageManager.writeOut();
+
+    Log.notice("Connected");
+    Log.notice("IP address: %s", WiFi.localIP().toString().c_str());
+
+    WiFi.setAutoReconnect(true);
+    WiFi.setAutoConnect(true);
+
+    onWifiConnected();
+}
+
 void setupWifi() {
-    digitalWrite(LED_BUILTIN, LOW);
+    status.setStatus(SystemStatus::connecting);
     auto ssid = setupManager.getSSID();
-    auto password = setupManager.getWiFiPassword();
+
     WiFi.setAutoConnect(false);
     WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid.c_str(), password.c_str());
-    auto connectionMsg = "Connecting to " + ssid + "...";
-    Serial.println(connectionMsg.c_str());
+    WiFi.begin(ssid.c_str(), setupManager.getWiFiPassword().c_str());
+
+    auto connectionMsg = "Connecting to " + ssid;
+    Log.notice(connectionMsg.c_str());
 
     messageManager.setMessage(connectionMsg, false);
     messageManager.writeOut();
 
     // Wait for connection
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-    messageManager.setMessage("Connected", false);
-    messageManager.writeOut();
-
-    Serial.println("");
-    Serial.print("Connected to ");
-    Serial.println(ssid.c_str());
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-    WiFi.setAutoReconnect(true);
-    WiFi.setAutoConnect(true);
-    digitalWrite(LED_BUILTIN, HIGH);
-}
-
-void onWifiConnected() {
-    client = std::make_shared<StatusClient>(status_url, fingerprint, setupManager.getAuthorization());
-    updateClient();
-
-    tickers.emplace_back(updateClient, 1000 * 60, 0, MILLIS);
+    checkWiFi();
 }
 
 void checkForSettings() {
@@ -129,11 +147,10 @@ void checkForSettings() {
         return;
     }
     // received the settings. Stop the ticker and start the wifi
-    setupWifi();
     tickers.clear();
-    onWifiConnected();
+    setupWifi();
 
-    tickers.emplace_back(eventLoop, 1000/RATE, 0, MILLIS);
+    tickers.emplace_back(eventLoop, iterations, 0, MILLIS);
     std::for_each(tickers.begin(), tickers.end(), [](Ticker &t) { t.start(); });
 }
 
@@ -145,12 +162,15 @@ void setup() {
     Wire.begin(SDA, SCL);
     SPIFFS.begin();
     Serial.begin(115200);
+    Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
     setupManager.init();
 
     // turn all LEDs off
     lights.off();
     messageManager.clear();
 
+    // If there are no settings, begin setup flow, which starts the setup server and sets the setup ticker event
+    // If there are settings, bypass and connect to wifi, which will create the event loop for us
     if (!setupManager.checkForSettings()) {
         std::vector<std::string> messages = {
                 "Setup required",
@@ -161,13 +181,12 @@ void setup() {
         messageManager.setMessages(messages);
         setupManager.remoteSetup();
 
-        tickers.emplace_back(checkForSettings, 1000 / RATE, 0, MILLIS);
+        tickers.emplace_back(checkForSettings, iterations, 0, MILLIS);
+        tickers.emplace_back(eventLoop, iterations, 0, MILLIS);
     } else {
         setupWifi();
-        onWifiConnected();
     }
 
-    tickers.emplace_back(eventLoop, 1000/RATE, 0, MILLIS);
     std::for_each(tickers.begin(), tickers.end(), [](Ticker &t) { t.start(); });
 }
 
