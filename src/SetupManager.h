@@ -17,7 +17,7 @@ class Logging;
 
 class SetupManager: Manager {
 public:
-    SetupManager(fs::FS &fileSystem, Logging &log);
+    SetupManager(fs::FS &fileSystem, ESP8266WiFiClass &wifi, Logging &log);
     void init();
     bool checkForSettings();
 
@@ -43,6 +43,7 @@ private:
     std::string authorization;
     
     fs::FS &fileSystem;
+    ESP8266WiFiClass &wifi;
     Logging &log;
 
     std::unique_ptr<SetupServer> srv;

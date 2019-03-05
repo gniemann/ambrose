@@ -44,7 +44,7 @@ Tickers tickers;
 std::shared_ptr<StatusClient> client;
 auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>();
 MessageManager<6> messageManager;
-SetupManager setupManager(SPIFFS, Log);
+SetupManager setupManager(SPIFFS, WiFi, Log);
 SystemStatusIndicator<D4, D0, D8> status;
 
 constexpr int secondsInMillis(int sec) {

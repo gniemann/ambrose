@@ -43,8 +43,8 @@ bool SetupManager::checkForSettings() {
 }
 
 void SetupManager::remoteSetup() {
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP("devops_monitor_ap");
+    wifi.mode(WIFI_AP);
+    wifi.softAP("devops_monitor_ap");
     log.notice("IP address: %s", WiFi.softAPIP().toString().c_str());
     srv = std::unique_ptr<SetupServer>(new SetupServer([this](Settings s) { this->receiveSettings(s); }));
     log.trace("Waiting for settings");
@@ -61,7 +61,7 @@ void SetupManager::reset() {
 }
 
 void SetupManager::receiveSettings(Settings settings) {
-    WiFi.softAPdisconnect(true);
+    wifi.softAPdisconnect(true);
     log.notice("Received settings");
 
     ssid = settings.ssid;
@@ -91,4 +91,4 @@ void SetupManager::init() {
     hasSettings = checkFSForSettings();
 }
 
-SetupManager::SetupManager(fs::FS &fileSystem, Logging &log) : fileSystem(fileSystem), log(log) {}
+SetupManager::SetupManager(fs::FS &fileSystem, ESP8266WiFiClass &wifi, Logging &log) : fileSystem(fileSystem), wifi(wifi), log(log) {}
