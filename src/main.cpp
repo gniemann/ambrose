@@ -45,7 +45,7 @@ std::shared_ptr<StatusClient> client;
 auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>();
 MessageManager<6> messageManager;
 SetupManager setupManager(SPIFFS, WiFi, Log);
-SystemStatusIndicator<D4, D0, D8> status;
+//SystemStatusIndicator<D4, D0, D8> status;
 
 constexpr int secondsInMillis(int sec) {
     return sec * 1000;
@@ -82,15 +82,15 @@ void eventLoop() {
 }
 
 void updateClient() {
-    status.setStatus(SystemStatus::transmitting);
+//    status.setStatus(SystemStatus::transmitting);
     auto resp = client->get();
 
     Log.trace("Status code %d\n", resp);
     if (resp < 200 || resp >= 400) {
-        status.setStatus(SystemStatus::failed);
+//        status.setStatus(SystemStatus::failed);
         messageManager.setMessage(client->error(resp), false);
     } else if (resp != 304) {
-        status.setStatus(SystemStatus::idle);
+//        status.setStatus(SystemStatus::idle);
         auto update = client->parse_json();
         lights.update(update.lights);
         messageManager.setMessages(update.messages);
@@ -115,7 +115,7 @@ void checkWiFi() {
     }
 
     // connected
-    status.setStatus(SystemStatus::idle);
+//    status.setStatus(SystemStatus::idle);
     messageManager.setMessage("Connected", false);
     messageManager.writeOut();
 
@@ -129,7 +129,7 @@ void checkWiFi() {
 }
 
 void setupWifi() {
-    status.setStatus(SystemStatus::connecting);
+//    status.setStatus(SystemStatus::connecting);
     auto ssid = setupManager.getSSID();
 
     WiFi.setAutoConnect(false);
