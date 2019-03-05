@@ -27,6 +27,9 @@ private:
 
 template<uint8_t redPin, uint8_t greenPin, uint8_t bluePin>
 SystemStatusIndicator<redPin, greenPin, bluePin>::SystemStatusIndicator() {
+    pinMode(redPin, OUTPUT);
+    pinMode(greenPin, OUTPUT);
+    pinMode(bluePin, OUTPUT);
     setStatus(SystemStatus::notConnected);
 }
 

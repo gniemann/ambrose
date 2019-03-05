@@ -52,7 +52,7 @@ constexpr int secondsInMillis(int sec) {
 }
 
 void reset() {
-    Log.notice("Resetting");
+    Log.notice("Resetting\n");
     setupManager.reset();
     WiFi.disconnect();
     WiFi.setAutoConnect(false);
@@ -75,6 +75,7 @@ void resetButtonReleased() {
 ResetButton<RESET> resetButton(resetButtonPushed, resetButtonReleased);
 
 void eventLoop() {
+    Log.trace("Event loop\n");
     lights.run();
     messageManager.run();
     resetButton.run();
@@ -84,7 +85,7 @@ void updateClient() {
     status.setStatus(SystemStatus::transmitting);
     auto resp = client->get();
 
-    Log.trace("Status code %d", resp);
+    Log.trace("Status code %d\n", resp);
     if (resp < 200 || resp >= 400) {
         status.setStatus(SystemStatus::failed);
         messageManager.setMessage(client->error(resp), false);
@@ -100,12 +101,16 @@ void onWifiConnected() {
     client = std::make_shared<StatusClient>(Log, status_url, fingerprint, setupManager.getAuthorization());
     updateClient();
 
-    tickers.emplace_back(updateClient, MINUTE, 0, MILLIS);
+    Ticker tick(updateClient, MINUTE, 0, MILLIS);
+    tick.start();
+    tickers.push_back(tick);
 }
 
 void checkWiFi() {
     if (WiFi.status() != WL_CONNECTED) {
-        tickers.emplace_back(checkWiFi, 500, 1, MILLIS);
+        Ticker tick(checkWiFi, 500, 1, MILLIS);
+        tick.start();
+        tickers.push_back(tick);
         return;
     }
 
@@ -114,8 +119,8 @@ void checkWiFi() {
     messageManager.setMessage("Connected", false);
     messageManager.writeOut();
 
-    Log.notice("Connected");
-    Log.notice("IP address: %s", WiFi.localIP().toString().c_str());
+    Log.notice("Connected\n");
+    Log.notice("IP address: %s\n", WiFi.localIP().toString().c_str());
 
     WiFi.setAutoReconnect(true);
     WiFi.setAutoConnect(true);
@@ -132,7 +137,7 @@ void setupWifi() {
     WiFi.begin(ssid.c_str(), setupManager.getWiFiPassword().c_str());
 
     auto connectionMsg = "Connecting to " + ssid;
-    Log.notice(connectionMsg.c_str());
+    Log.notice("%s\n", connectionMsg.c_str());
 
     messageManager.setMessage(connectionMsg, false);
     messageManager.writeOut();
@@ -182,11 +187,11 @@ void setup() {
         setupManager.remoteSetup();
 
         tickers.emplace_back(checkForSettings, iterations, 0, MILLIS);
-        tickers.emplace_back(eventLoop, iterations, 0, MILLIS);
     } else {
         setupWifi();
     }
 
+    tickers.emplace_back(eventLoop, iterations, 0, MILLIS);
     std::for_each(tickers.begin(), tickers.end(), [](Ticker &t) { t.start(); });
 }
 
