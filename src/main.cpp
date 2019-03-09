@@ -11,6 +11,7 @@
 #include <Stepper.h>
 #include <FS.h>
 #include <ArduinoLog.h>
+#include <Adafruit_MCP23008.h>
 
 #include "StatusClient.h"
 #include "LightManager.h"
@@ -27,11 +28,11 @@ const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC
 using Pin = uint8_t;
 using Hz = int;
 
-constexpr std::size_t ledCNT = 9;
+constexpr std::size_t ledCNT = 10;
 
-const Pin DATA = D5;
-const Pin CLOCK = D6;
-const Pin LATCH = D7;
+const Pin DATA = 2;
+const Pin CLOCK = 0;
+const Pin LATCH = 1;
 const Pin RESET = D3;
 
 const Hz RATE = 5;
@@ -42,10 +43,12 @@ using Tickers = std::vector<Ticker>;
 Tickers tickers;
 
 std::shared_ptr<StatusClient> client;
-auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>();
+
+Adafruit_MCP23008 lightsMcp;
+auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>(lightsMcp);
 MessageManager<6> messageManager;
 SetupManager setupManager(SPIFFS, WiFi, Log);
-//SystemStatusIndicator<D4, D0, D8> status;
+SystemStatusIndicator<D5, D6, D7> status;
 
 constexpr int secondsInMillis(int sec) {
     return sec * 1000;
@@ -61,36 +64,37 @@ void reset() {
 
 void resetButtonPushed(long long duration) {
     if (duration > secondsInMillis(6)) {
-        digitalWrite(LED_BUILTIN, HIGH);
         reset();
     } else if (duration > secondsInMillis(3)) {
-        digitalWrite(LED_BUILTIN, LOW);
+        status.setStatus(SystemStatus::resetPressedLong);
+    } else {
+        status.setStatus(SystemStatus::resetPressed);
     }
 }
 
 void resetButtonReleased() {
-    digitalWrite(LED_BUILTIN, HIGH);
+    status.setStatus(SystemStatus::idle);
 }
 
 ResetButton<RESET> resetButton(resetButtonPushed, resetButtonReleased);
 
 void eventLoop() {
-    Log.trace("Event loop\n");
     lights.run();
     messageManager.run();
     resetButton.run();
+    status.run();
 }
 
 void updateClient() {
-//    status.setStatus(SystemStatus::transmitting);
+    status.setStatus(SystemStatus::transmitting);
     auto resp = client->get();
 
     Log.trace("Status code %d\n", resp);
     if (resp < 200 || resp >= 400) {
-//        status.setStatus(SystemStatus::failed);
+        status.setStatus(SystemStatus::failed);
         messageManager.setMessage(client->error(resp), false);
     } else if (resp != 304) {
-//        status.setStatus(SystemStatus::idle);
+        status.setStatus(SystemStatus::idle);
         auto update = client->parse_json();
         lights.update(update.lights);
         messageManager.setMessages(update.messages);
@@ -115,7 +119,7 @@ void checkWiFi() {
     }
 
     // connected
-//    status.setStatus(SystemStatus::idle);
+    status.setStatus(SystemStatus::idle);
     messageManager.setMessage("Connected", false);
     messageManager.writeOut();
 
@@ -129,7 +133,7 @@ void checkWiFi() {
 }
 
 void setupWifi() {
-//    status.setStatus(SystemStatus::connecting);
+    status.setStatus(SystemStatus::connecting);
     auto ssid = setupManager.getSSID();
 
     WiFi.setAutoConnect(false);

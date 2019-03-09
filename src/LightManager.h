@@ -10,18 +10,20 @@
 #include <algorithm>
 #include "led.h"
 #include "Manager.h"
+#include <Adafruit_MCP23008.h>
 
 using Pin = uint8_t;
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
 class LightManager: Manager {
 public:
-    LightManager();
+    LightManager(Adafruit_MCP23008 &mcp);
     void off();
     void update(const Lights &newLights);
     void setLights() const;
     void run() override;
 private:
+    Adafruit_MCP23008 &mcp;
     bool isNormalOperation;
     std::array<LEDPtr, N> lights;
 
@@ -47,10 +49,11 @@ uint8_t colorToByte(const Color &c) {
 }
 
 template<Pin DATA, Pin CLOCK, Pin LATCH, size_t N>
-LightManager<DATA, CLOCK, LATCH, N>::LightManager(): isNormalOperation(true) {
-    pinMode(DATA, OUTPUT);
-    pinMode(CLOCK, OUTPUT);
-    pinMode(LATCH, OUTPUT);
+LightManager<DATA, CLOCK, LATCH, N>::LightManager(Adafruit_MCP23008 &mcp): mcp(mcp), isNormalOperation(true) {
+    mcp.begin();
+    mcp.pinMode(DATA, OUTPUT);
+    mcp.pinMode(CLOCK, OUTPUT);
+    mcp.pinMode(LATCH, OUTPUT);
 }
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>
@@ -93,12 +96,21 @@ void LightManager<DATA, CLOCK, LATCH, N>::setLights() const {
         output = (output<<3) + colorToByte((*iter)->getColor());
     }
 
-    digitalWrite(LATCH, LOW);
+    mcp.digitalWrite(LATCH, LOW);
+
     for (int i = sizeof(uint64_t) * 7; i >= 0; i-=8) {
         uint8_t shift = (output >> i) & 0xFF;
-        shiftOut(DATA, CLOCK, MSBFIRST, ~shift);
+        shift = ~shift;
+
+        for (uint8_t j = 0; j < 8; j++) {
+            // this is copied from the core_esp8266_wiring_shift.c impl of shiftOut
+            mcp.digitalWrite(DATA, !!(shift & (1 << (7 - j))));
+            mcp.digitalWrite(CLOCK, HIGH);
+            mcp.digitalWrite(CLOCK, LOW);
+        }
     }
-    digitalWrite(LATCH, HIGH);
+
+    mcp.digitalWrite(LATCH, HIGH);
 }
 
 template <Pin DATA, Pin CLOCK, Pin LATCH, std::size_t N>

@@ -6,11 +6,14 @@
 #define BUILD_MONITOR_SYSTEMSTATUSINDICATOR_H
 
 enum class SystemStatus {
+    off,
     idle,
     transmitting,
     connecting,
     notConnected,
-    failed
+    failed,
+    resetPressed,
+    resetPressedLong,
 };
 
 template <uint8_t redPin, uint8_t greenPin, uint8_t bluePin>
@@ -30,17 +33,20 @@ SystemStatusIndicator<redPin, greenPin, bluePin>::SystemStatusIndicator() {
     pinMode(redPin, OUTPUT);
     pinMode(greenPin, OUTPUT);
     pinMode(bluePin, OUTPUT);
-    setStatus(SystemStatus::notConnected);
+    setStatus(SystemStatus::off);
 }
 
 template<uint8_t redPin, uint8_t greenPin, uint8_t bluePin>
 void SystemStatusIndicator<redPin, greenPin, bluePin>::setStatus(SystemStatus newStatus) {
-    if (newStatus == status) {
+    if (newStatus == status && led != nullptr) {
         return;
     }
     status = newStatus;
 
     switch (status) {
+        case SystemStatus::off:
+            led = LEDPtr(new LED(OFF));
+            break;
         case SystemStatus::idle:
             led = LEDPtr(new LED(GREEN));
             break;
@@ -55,6 +61,12 @@ void SystemStatusIndicator<redPin, greenPin, bluePin>::setStatus(SystemStatus ne
             break;
         case SystemStatus::failed:
             led = LEDPtr(new LED(RED));
+            break;
+        case SystemStatus::resetPressed:
+            led = LEDPtr(new BlinkingLED(RED, 2, 2));
+            break;
+        case SystemStatus::resetPressedLong:
+            led = LEDPtr(new BlinkingLED(RED, 1, 1));
             break;
     }
 
