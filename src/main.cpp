@@ -92,7 +92,10 @@ void updateClient() {
     Log.trace("Status code %d\n", resp);
     if (resp < 200 || resp >= 400) {
         status.setStatus(SystemStatus::failed);
-        messageManager.setMessage(client->error(resp), false);
+
+        if (resp != HTTPC_ERROR_READ_TIMEOUT) {
+            messageManager.setMessage(client->error(resp), false);
+        }
     } else if (resp != 304) {
         status.setStatus(SystemStatus::idle);
         auto update = client->parse_json();

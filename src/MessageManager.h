@@ -84,12 +84,15 @@ void MessageManager<NumSegments>::setMessages(const Messages &newMessages) {
         return;
     }
 
+    if (messages.size() != newMessages.size()) {
+        messageIndex = 0;
+        messages.resize(newMessages.size());
+    }
+
     messages.clear();
     for (const auto& msg: newMessages) {
         messages.push_back(uppercase(msg));
     }
-
-    messageIndex = 0;
 
     if (currentMessage.empty()) {
         setCurrentMessage(messages.front(), true);
@@ -146,7 +149,7 @@ void MessageManager<NumSegments>::run() {
                 buffer[numCharacters - 1] = position < currentMessage.size() ? currentMessage[position++] : ' ';
 
                 if (position >= currentMessage.size() && currentMessage.size() > numCharacters) {
-                    state = MessageState::Paused;
+                    next();
                 }
             }
             break;
