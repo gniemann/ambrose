@@ -3,3 +3,4 @@
 CMakeListsPrivate.txt
 cmake-build-debug
 CMakeLists.txt
+.travis.yml
