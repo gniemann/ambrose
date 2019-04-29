@@ -5,6 +5,8 @@
 #ifndef BUILD_MONITOR_SYSTEMSTATUSINDICATOR_H
 #define BUILD_MONITOR_SYSTEMSTATUSINDICATOR_H
 
+#include <Adafruit_MCP23008.h>
+
 enum class SystemStatus {
     off,
     idle,
@@ -19,20 +21,22 @@ enum class SystemStatus {
 template <uint8_t redPin, uint8_t greenPin, uint8_t bluePin>
 class SystemStatusIndicator: Manager {
 public:
-    SystemStatusIndicator();
+    SystemStatusIndicator(Adafruit_MCP23008 &mcp);
     void setStatus(SystemStatus newStatus);
     void run() override;
 private:
     void display();
+    Adafruit_MCP23008 &mcp;
     SystemStatus status;
     LEDPtr led;
 };
 
 template<uint8_t redPin, uint8_t greenPin, uint8_t bluePin>
-SystemStatusIndicator<redPin, greenPin, bluePin>::SystemStatusIndicator() {
-    pinMode(redPin, OUTPUT);
-    pinMode(greenPin, OUTPUT);
-    pinMode(bluePin, OUTPUT);
+SystemStatusIndicator<redPin, greenPin, bluePin>::SystemStatusIndicator(Adafruit_MCP23008 &mcp): mcp(mcp) {
+    mcp.begin();
+    mcp.pinMode(redPin, OUTPUT);
+    mcp.pinMode(greenPin, OUTPUT);
+    mcp.pinMode(bluePin, OUTPUT);
     setStatus(SystemStatus::off);
 }
 
@@ -82,9 +86,9 @@ void SystemStatusIndicator<redPin, greenPin, bluePin>::run() {
 template<uint8_t redPin, uint8_t greenPin, uint8_t bluePin>
 void SystemStatusIndicator<redPin, greenPin, bluePin>::display() {
     Color col = led->getColor();
-    digitalWrite(redPin, col.red == 0 ? HIGH : LOW);
-    digitalWrite(greenPin, col.green == 0 ? HIGH : LOW);
-    digitalWrite(bluePin, col.blue == 0 ? HIGH : LOW);
+    mcp.digitalWrite(redPin, col.red == 0 ? HIGH : LOW);
+    mcp.digitalWrite(greenPin, col.green == 0 ? HIGH : LOW);
+    mcp.digitalWrite(bluePin, col.blue == 0 ? HIGH : LOW);
 }
 
 

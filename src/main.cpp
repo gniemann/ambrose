@@ -12,6 +12,7 @@
 #include <FS.h>
 #include <ArduinoLog.h>
 #include <Adafruit_MCP23008.h>
+#include <FastLED.h>
 
 #include "StatusClient.h"
 #include "LightManager.h"
@@ -25,15 +26,13 @@
 const char* status_url = "https://devops-status-monitor.herokuapp.com/api/status";
 const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
 
-using Pin = uint8_t;
+using PIN = uint8_t;
 using Hz = int;
 
 constexpr std::size_t ledCNT = 10;
 
-const Pin DATA = 2;
-const Pin CLOCK = 0;
-const Pin LATCH = 1;
-const Pin RESET = D3;
+const PIN NEOPIXEL_PIN = D5;
+const PIN RESET = D3;
 
 const Hz RATE = 5;
 const int iterations = 1000 / RATE;
@@ -44,11 +43,11 @@ Tickers tickers;
 
 std::shared_ptr<StatusClient> client;
 
-Adafruit_MCP23008 lightsMcp;
-auto lights = LightManager<DATA, CLOCK, LATCH, ledCNT>(lightsMcp);
+Adafruit_MCP23008 mcp;
+auto lights = LightManager<NEOPIXEL_PIN, ledCNT>();
 MessageManager<6> messageManager;
 SetupManager setupManager(SPIFFS, WiFi, Log);
-SystemStatusIndicator<D5, D6, D7> status;
+SystemStatusIndicator<0, 1, 2> status(mcp);
 
 constexpr int secondsInMillis(int sec) {
     return sec * 1000;

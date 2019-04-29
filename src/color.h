@@ -7,11 +7,11 @@
 
 class Color {
 public:
-    int red;
-    int green;
-    int blue;
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
 
-    Color(int r, int g, int b) : red(r), green(g), blue(b) {}
+    Color(uint8_t r, uint8_t g, uint8_t b) : red(r), green(g), blue(b) {}
 };
 
 const Color RED = Color(255, 0, 0);
