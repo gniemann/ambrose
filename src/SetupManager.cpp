@@ -10,21 +10,7 @@
 #include "SetupServer.h"
 
 bool SetupManager::checkFSForSettings() {
-    if (fileSystem.exists(ssidFilename) && fileSystem.exists(wifiPasswordFilename) && fileSystem.exists(authFilename)) {
-        auto SSIDFile = fileSystem.open(ssidFilename, "r");
-        if (!SSIDFile) {
-            return false;
-        }
-        ssid = SSIDFile.readString().c_str();
-        SSIDFile.close();
-
-        auto passwordFile = fileSystem.open(wifiPasswordFilename, "r");
-        if (!passwordFile) {
-            return false;
-        }
-        wifiPassword = passwordFile.readString().c_str();
-        passwordFile.close();
-
+    if (fileSystem.exists(authFilename)) {
         auto authFile = fileSystem.open(authFilename, "r");
         if (!authFile) {
             return false;
@@ -51,9 +37,7 @@ void SetupManager::remoteSetup() {
 }
 
 void SetupManager::reset() {
-    if (!fileSystem.remove(ssidFilename) ||
-        !fileSystem.remove(wifiPasswordFilename) ||
-        !fileSystem.remove(authFilename)) {
+    if (!fileSystem.remove(authFilename)) {
         log.fatal("Reset failed!");
     } else {
         log.notice("Reset successful");
@@ -62,19 +46,15 @@ void SetupManager::reset() {
 
 void SetupManager::receiveSettings(Settings settings) {
     wifi.softAPdisconnect(true);
-    log.notice("Received settings");
+    log.notice("Received settings. Connecting...");
 
-    ssid = settings.ssid;
-    wifiPassword = settings.wifiPassword;
+    WiFi.begin(settings.ssid.c_str(), settings.wifiPassword.c_str());
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(250);
+    }
+
+    //
     authorization = settings.username + ":" + settings.token;
-
-    auto ssidFile = fileSystem.open(ssidFilename, "w");
-    ssidFile.write((const uint8_t*)ssid.c_str(), ssid.size());
-    ssidFile.close();
-
-    auto passwordFile = fileSystem.open(wifiPasswordFilename, "w");
-    passwordFile.write((const uint8_t*)wifiPassword.c_str(), wifiPassword.size());
-    passwordFile.close();
 
     auto authFile = fileSystem.open(authFilename, "w");
     authFile.write((const uint8_t*)authorization.c_str(), authorization.size());

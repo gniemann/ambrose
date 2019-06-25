@@ -135,18 +135,15 @@ void checkWiFi() {
 }
 
 void setupWifi() {
-    status.setStatus(SystemStatus::connecting);
-    auto ssid = setupManager.getSSID();
+    if (WiFi.status() != WL_CONNECTED) {
+        auto connectingMsg = "Connecting to " + WiFi.SSID();
+        Log.notice("%s\n", connectingMsg.c_str());
 
-    WiFi.setAutoConnect(false);
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid.c_str(), setupManager.getWiFiPassword().c_str());
+        messageManager.setMessage(connectingMsg.c_str(), false);
+        messageManager.writeOut();
 
-    auto connectionMsg = "Connecting to " + ssid;
-    Log.notice("%s\n", connectionMsg.c_str());
-
-    messageManager.setMessage(connectionMsg, false);
-    messageManager.writeOut();
+        status.setStatus(SystemStatus::connecting);
+    }
 
     // Wait for connection
     checkWiFi();
@@ -160,6 +157,7 @@ void checkForSettings() {
     // received the settings. Stop the ticker and start the wifi
     tickers.clear();
     setupWifi();
+    WiFi.softAPdisconnect(true);
 
     tickers.emplace_back(eventLoop, iterations, 0, MILLIS);
     std::for_each(tickers.begin(), tickers.end(), [](Ticker &t) { t.start(); });
@@ -175,6 +173,7 @@ void setup() {
     Serial.begin(115200);
     Log.begin(LOG_LEVEL_VERBOSE, &Serial, true);
     setupManager.init();
+    WiFi.setAutoConnect(true);
 
     // turn all LEDs off
     lights.off();

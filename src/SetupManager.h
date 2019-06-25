@@ -27,19 +27,13 @@ public:
 
     void run() override;
 
-    std::string getSSID() const { return ssid; }
-    std::string getWiFiPassword() const { return wifiPassword; }
     std::string getAuthorization() const { return authorization; }
 private:
     bool checkFSForSettings();
     void receiveSettings(Settings settings);
     bool hasSettings;
-    const char *ssidFilename = "/ssid";
-    const char *wifiPasswordFilename = "/wifiPassword";
     const char *authFilename = "/authorization";
 
-    std::string ssid;
-    std::string wifiPassword;
     std::string authorization;
     
     fs::FS &fileSystem;
