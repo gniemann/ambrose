@@ -94,7 +94,6 @@ std::string StatusClient::error(int code) const {
 }
 
 StatusClient::StatusClient(Logging &log, std::string url, std::string fingerprint, std::string auth) : url(std::move(url)), fingerprint(std::move(fingerprint)), log(log) {
-    authorization = base64::encode(auth.c_str()).c_str();
-    authorization = "Basic " + authorization;
+    authorization = "Bearer " + auth;
 }
 

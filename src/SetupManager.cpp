@@ -5,9 +5,17 @@
 #include <ESP8266WiFi.h>
 #include <FS.h>
 #include <ArduinoLog.h>
+#include <ArduinoJson.h>
+#include <ESP8266HTTPClient.h>
+#include <base64.h>
 
 #include "SetupManager.h"
 #include "SetupServer.h"
+
+const char* registration_url = "https://devops-status-monitor.herokuapp.com/api/devices/register";
+const char *cert_fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
+
+const size_t capacity = 2 * JSON_OBJECT_SIZE(1) + 1000;
 
 bool SetupManager::checkFSForSettings() {
     if (fileSystem.exists(authFilename)) {
@@ -53,8 +61,30 @@ void SetupManager::receiveSettings(Settings settings) {
         delay(250);
     }
 
-    //
-    authorization = settings.username + ":" + settings.token;
+    std::string auth = settings.username + ":" + settings.token;
+
+    auto authHeader = "Basic " + base64::encode(auth.c_str());
+
+    // get the device token
+    HTTPClient client;
+    if (!client.begin(registration_url, cert_fingerprint)) {
+        log.notice("Could not begin session");
+    }
+
+    client.addHeader("Authorization", authHeader.c_str());
+    client.addHeader("Content-Type", "application/json");
+    auto payload = "{\"name\": \"ambrose X\"}";
+    auto status = client.POST(payload);
+
+    if (status < 200 || status >= 400) {
+        log.notice("Received non-200 status for device registration");
+    }
+
+    DynamicJsonBuffer jsonBuffer(capacity);
+
+    JsonObject& root = jsonBuffer.parseObject(client.getStream());
+
+    authorization = std::string(root["access_token"].as<char*>());
 
     auto authFile = fileSystem.open(authFilename, "w");
     authFile.write((const uint8_t*)authorization.c_str(), authorization.size());
