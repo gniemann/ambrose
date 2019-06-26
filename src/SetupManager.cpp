@@ -8,23 +8,28 @@
 #include <ArduinoJson.h>
 #include <ESP8266HTTPClient.h>
 #include <base64.h>
-
 #include "SetupManager.h"
-#include "SetupServer.h"
 
-const char* registration_url = "https://devops-status-monitor.herokuapp.com/api/devices/register";
 const char *cert_fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
 
 const size_t capacity = 2 * JSON_OBJECT_SIZE(1) + 1000;
 
 bool SetupManager::checkFSForSettings() {
-    if (fileSystem.exists(authFilename)) {
+    if (fileSystem.exists(authFilename) && fileSystem.exists(hostnameFilename)) {
         auto authFile = fileSystem.open(authFilename, "r");
         if (!authFile) {
             return false;
         }
-        authorization = authFile.readString().c_str();
+        authorization = authFile.readString();
         authFile.close();
+
+        auto hostFile = fileSystem.open(hostnameFilename, "r");
+        if (!hostFile) {
+            return false;
+        }
+
+        hostname = hostFile.readString();
+        hostFile.close();
 
         return true;
     }
@@ -39,8 +44,15 @@ bool SetupManager::checkForSettings() {
 void SetupManager::remoteSetup() {
     wifi.mode(WIFI_AP);
     wifi.softAP("devops_monitor_ap");
-    log.notice("IP address: %s", WiFi.softAPIP().toString().c_str());
-    srv = std::unique_ptr<SetupServer>(new SetupServer([this](Settings s) { this->receiveSettings(s); }));
+    log.notice("IP address: %s\n", WiFi.softAPIP().toString().c_str());
+
+    server.serveStatic("/bootstrap.min.css", SPIFFS, "/bootstrap.min.css", "maxage=86400");
+    server.serveStatic("/", SPIFFS, "/wifi.html");
+    server.on("/wifi", HTTP_POST, [this]() { this->postWifi(); } );
+    server.on("/settings", HTTP_POST, [this]() { this->postSettings(); } );
+
+    server.begin();
+
     log.trace("Waiting for settings");
 }
 
@@ -52,49 +64,74 @@ void SetupManager::reset() {
     }
 }
 
-void SetupManager::receiveSettings(Settings settings) {
-    wifi.softAPdisconnect(true);
-    log.notice("Received settings. Connecting...");
+void SetupManager::postWifi() {
+    auto ssid = server.arg("ssid");
+    auto wifiPassword = server.arg("wifi-password");
 
-    WiFi.begin(settings.ssid.c_str(), settings.wifiPassword.c_str());
+    log.notice("Received wifi settings. Connecting...");
+
+    WiFi.begin(ssid, wifiPassword);
     while (WiFi.status() != WL_CONNECTED) {
         delay(250);
     }
 
-    std::string auth = settings.username + ":" + settings.token;
+    File file = SPIFFS.open("/device.html", "r");
+    server.streamFile(file, "text/html");
+    file.close();
+}
 
-    auto authHeader = "Basic " + base64::encode(auth.c_str());
+void SetupManager::postSettings() {
+    hostname = server.arg("hostname");
+    auto username = server.arg("username");
+    auto password = server.arg("password");
+    auto deviceName = server.arg("devicename");
+
+    auto auth = username + ":" + password;
+    auto authHeader = "Basic " + base64::encode(auth);
 
     // get the device token
     HTTPClient client;
+    auto registration_url = hostname + "/api/devices/register";
     if (!client.begin(registration_url, cert_fingerprint)) {
         log.notice("Could not begin session");
+        // TODO: Return failure page
     }
 
-    client.addHeader("Authorization", authHeader.c_str());
+    client.addHeader("Authorization", authHeader);
     client.addHeader("Content-Type", "application/json");
-    auto payload = "{\"name\": \"ambrose X\"}";
-    auto status = client.POST(payload);
 
+    auto payload = R"({"name": ")" + deviceName + "\"}";
+
+    auto status = client.POST(payload);
     if (status < 200 || status >= 400) {
         log.notice("Received non-200 status for device registration");
+        // TODO: Return failure page
     }
 
     DynamicJsonBuffer jsonBuffer(capacity);
-
     JsonObject& root = jsonBuffer.parseObject(client.getStream());
 
-    authorization = std::string(root["access_token"].as<char*>());
+    authorization = root["access_token"].as<char*>();
 
     auto authFile = fileSystem.open(authFilename, "w");
-    authFile.write((const uint8_t*)authorization.c_str(), authorization.size());
+    authFile.write((const uint8_t*)authorization.c_str(), authorization.length());
     authFile.close();
 
+    auto hostFile = fileSystem.open(hostnameFilename, "w");
+    hostFile.write((const uint8_t*)hostname.c_str(), hostname.length());
+    hostFile.close();
+
     hasSettings = true;
+
+    File file = SPIFFS.open("/success.html", "r");
+    server.streamFile(file, "text/html");
+    file.close();
+
+    wifi.softAPdisconnect(true);
 }
 
 void SetupManager::run() {
-    srv->handleClients();
+    server.handleClient();
 }
 
 void SetupManager::init() {

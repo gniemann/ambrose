@@ -1,3 +1,5 @@
+#include <utility>
+
 //
 // Created by Greg Niemann on 11/4/18.
 //
@@ -13,8 +15,6 @@
 
 #include "StatusClient.h"
 
-const char *ETAG = "ETag";
-const char *IF_NONE_MATCH = "If-None-Match";
 const char *AUTHORIZATION = "Authorization";
 
 const size_t capacity = JSON_ARRAY_SIZE(2) + JSON_ARRAY_SIZE(9) + 6*JSON_OBJECT_SIZE(2) + 13*JSON_OBJECT_SIZE(3) + 4*JSON_OBJECT_SIZE(6) + 1000;
@@ -22,20 +22,15 @@ const size_t capacity = JSON_ARRAY_SIZE(2) + JSON_ARRAY_SIZE(9) + 6*JSON_OBJECT_
 int StatusClient::get() {
     client.end();
 
-    if (!client.begin(url.c_str(), fingerprint.c_str())) {
+    if (!client.begin(url, fingerprint)) {
         return 0;
     }
 
-    client.addHeader(IF_NONE_MATCH, etag.c_str());
-    client.addHeader(AUTHORIZATION, authorization.c_str());
+    client.addHeader(AUTHORIZATION, authorization);
 
     auto status = client.GET();
     if (status < 200 || status >= 400) {
         return status;
-    }
-
-    if (client.hasHeader(ETAG)) {
-        etag = client.header(ETAG).c_str();
     }
 
     return status;
@@ -93,7 +88,8 @@ std::string StatusClient::error(int code) const {
     }
 }
 
-StatusClient::StatusClient(Logging &log, std::string url, std::string fingerprint, std::string auth) : url(std::move(url)), fingerprint(std::move(fingerprint)), log(log) {
+StatusClient::StatusClient(Logging &log, const String &hostname, String fingerprint, const String &auth) : fingerprint(std::move(fingerprint)), log(log) {
     authorization = "Bearer " + auth;
+    url = hostname + "/api/status";
 }
 

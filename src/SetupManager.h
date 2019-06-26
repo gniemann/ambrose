@@ -2,11 +2,10 @@
 // Created by Greg Niemann on 2019-02-11.
 //
 
-#ifndef BUILD_MONITOR_SETTINGSMANAGER_H
-#define BUILD_MONITOR_SETTINGSMANAGER_H
+#ifndef BUILD_MONITOR_SETUPMANAGER_H
+#define BUILD_MONITOR_SETUPMANAGER_H
 
-
-#include "SetupServer.h"
+#include <ESP8266WebServer.h>
 #include "Manager.h"
 
 namespace fs {
@@ -27,21 +26,25 @@ public:
 
     void run() override;
 
-    std::string getAuthorization() const { return authorization; }
+    String getAuthorization() const { return authorization; }
+    String getHostname() const { return hostname; }
 private:
     bool checkFSForSettings();
-    void receiveSettings(Settings settings);
+    void postWifi();
+    void postSettings();
     bool hasSettings;
-    const char *authFilename = "/authorization";
 
-    std::string authorization;
+    const char *authFilename = "/authorization";
+    const char *hostnameFilename = "/hostname";
+
+    String authorization;
+    String hostname;
     
     fs::FS &fileSystem;
     ESP8266WiFiClass &wifi;
+    ESP8266WebServer server;
     Logging &log;
-
-    std::unique_ptr<SetupServer> srv;
 };
 
 
-#endif //BUILD_MONITOR_SETTINGSMANAGER_H
+#endif //BUILD_MONITOR_SETUPMANAGER_H

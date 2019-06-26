@@ -19,17 +19,16 @@ class HTTPClient;
 
 class StatusClient {
 public:
-    StatusClient(Logging &log, std::string url, std::string fingerprint, std::string auth);
+    StatusClient(Logging &log, const String &hostname, String fingerprint, const String &auth);
 
     int get();
     std::string error(int code) const;
 
     Updates parse_json();
 private:
-    std::string url;
-    std::string fingerprint;
-    std::string authorization;
-    std::string etag;
+    String url;
+    String fingerprint;
+    String authorization;
     HTTPClient client;
 
     Logging &log;

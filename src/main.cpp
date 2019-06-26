@@ -16,14 +16,12 @@
 
 #include "StatusClient.h"
 #include "LightManager.h"
-#include "SetupServer.h"
 #include "SetupManager.h"
 #include "MessageManager.h"
 #include "DialIndicator.h"
 #include "ResetButton.h"
 #include "SystemStatusIndicator.h"
 
-const char* status_url = "https://devops-status-monitor.herokuapp.com/api/status";
 const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
 
 using PIN = uint8_t;
@@ -104,7 +102,7 @@ void updateClient() {
 }
 
 void onWifiConnected() {
-    client = std::make_shared<StatusClient>(Log, status_url, fingerprint, setupManager.getAuthorization());
+    client = std::make_shared<StatusClient>(Log, setupManager.getHostname(), fingerprint, setupManager.getAuthorization());
     updateClient();
 
     Ticker tick(updateClient, MINUTE, 0, MILLIS);
@@ -157,7 +155,6 @@ void checkForSettings() {
     // received the settings. Stop the ticker and start the wifi
     tickers.clear();
     setupWifi();
-    WiFi.softAPdisconnect(true);
 
     tickers.emplace_back(eventLoop, iterations, 0, MILLIS);
     std::for_each(tickers.begin(), tickers.end(), [](Ticker &t) { t.start(); });
