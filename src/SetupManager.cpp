@@ -100,7 +100,20 @@ void SetupManager::postSettings() {
     client.addHeader("Authorization", authHeader);
     client.addHeader("Content-Type", "application/json");
 
-    auto payload = R"({"name": ")" + deviceName + "\"}";
+    std::array<String, 4> keys = {
+            R"("name": ")" + deviceName + "\"",
+            R"("lights": 10)",
+            R"("gagues": 0)",
+            R"("messages": true)"
+    };
+    auto key = keys.cbegin();
+    String payload = "{" + *key;
+
+    while (++key != keys.end()) {
+        payload += ", " + *key;
+    }
+
+    payload += "}";
 
     auto status = client.POST(payload);
     if (status < 200 || status >= 400) {
