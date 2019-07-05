@@ -182,7 +182,7 @@ void setup() {
         std::vector<std::string> messages = {
                 "Setup required",
                 "Connect to devops_monitor_ap WiFi network",
-                "Navigate to http://192.168.4.1",
+                "Navigate to http://ambrose.local",
                 "Follow instructions to complete setup",
             };
         messageManager.setMessages(messages);

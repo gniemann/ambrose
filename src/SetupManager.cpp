@@ -8,6 +8,7 @@
 #include <ArduinoJson.h>
 #include <ESP8266HTTPClient.h>
 #include <base64.h>
+#include <ESP8266mDNS.h>
 #include "SetupManager.h"
 
 const char *cert_fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
@@ -46,7 +47,7 @@ void SetupManager::remoteSetup() {
     wifi.softAP("devops_monitor_ap");
     log.notice("IP address: %s\n", WiFi.softAPIP().toString().c_str());
 
-    server.serveStatic("/bootstrap.min.css", SPIFFS, "/bootstrap.min.css", "maxage=86400");
+    server.serveStatic("/bootstrap.min.css", SPIFFS, "/bootstrap.min.css", "max-age=31536000");
     server.serveStatic("/", SPIFFS, "/wifi.html");
     server.on("/wifi", HTTP_POST, [this]() { this->postWifi(); } );
     server.on("/settings", HTTP_POST, [this]() { this->postSettings(); } );
@@ -54,6 +55,13 @@ void SetupManager::remoteSetup() {
     server.begin();
 
     log.trace("Waiting for settings");
+
+    // set up mDNS
+
+    if (!MDNS.begin("ambrose")) {
+        log.error("Error setting up mDNS");
+    }
+    MDNS.addService("http", "tcp", 80);
 }
 
 void SetupManager::reset() {
@@ -140,10 +148,15 @@ void SetupManager::postSettings() {
     server.streamFile(file, "text/html");
     file.close();
 
+
+
     wifi.softAPdisconnect(true);
+    MDNS.close();
+    server.close();
 }
 
 void SetupManager::run() {
+    MDNS.update();
     server.handleClient();
 }
 
