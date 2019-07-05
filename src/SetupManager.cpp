@@ -111,7 +111,7 @@ void SetupManager::postSettings() {
     std::array<String, 4> keys = {
             R"("name": ")" + deviceName + "\"",
             R"("lights": 10)",
-            R"("gagues": 0)",
+            R"("gauges": 0)",
             R"("messages": true)"
     };
     auto key = keys.cbegin();
