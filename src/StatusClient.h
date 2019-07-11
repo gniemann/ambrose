@@ -5,6 +5,7 @@
 #ifndef BUILD_MONITOR_CLIENT_H
 #define BUILD_MONITOR_CLIENT_H
 
+#include <WiFiClientSecureBearSSL.h>
 #include "led.h"
 
 using Messages = std::vector<std::string>;
@@ -19,7 +20,7 @@ class HTTPClient;
 
 class StatusClient {
 public:
-    StatusClient(Logging &log, const String &hostname, String fingerprint, const String &auth);
+    StatusClient(Logging &log, const String &hostname, const String& fingerprint, const String &auth);
 
     int get();
     std::string error(int code) const;
@@ -27,9 +28,9 @@ public:
     Updates parse_json();
 private:
     String url;
-    String fingerprint;
     String authorization;
     HTTPClient client;
+    BearSSL::WiFiClientSecure wifiClient;
 
     Logging &log;
 };

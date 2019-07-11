@@ -12,6 +12,7 @@
 #include <ArduinoLog.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
+#include <WiFiClientSecureBearSSL.h>
 
 #include "StatusClient.h"
 
@@ -22,7 +23,7 @@ const size_t capacity = JSON_ARRAY_SIZE(2) + JSON_ARRAY_SIZE(9) + 6*JSON_OBJECT_
 int StatusClient::get() {
     client.end();
 
-    if (!client.begin(url, fingerprint)) {
+    if (!client.begin(wifiClient, url)) {
         return 0;
     }
 
@@ -88,8 +89,9 @@ std::string StatusClient::error(int code) const {
     }
 }
 
-StatusClient::StatusClient(Logging &log, const String &hostname, String fingerprint, const String &auth) : fingerprint(std::move(fingerprint)), log(log) {
+StatusClient::StatusClient(Logging &log, const String &hostname, const String& fingerprint, const String &auth) : log(log) {
     authorization = "Bearer " + auth;
     url = hostname + "/api/status";
+    wifiClient.setFingerprint(fingerprint.c_str());
 }
 
