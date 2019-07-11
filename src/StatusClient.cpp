@@ -89,9 +89,11 @@ std::string StatusClient::error(int code) const {
     }
 }
 
-StatusClient::StatusClient(Logging &log, const String &hostname, const String& fingerprint, const String &auth) : log(log) {
+StatusClient::StatusClient(Logging &log, const String &hostname, const String& pem, const String &auth) : log(log) {
     authorization = "Bearer " + auth;
     url = hostname + "/api/status";
-    wifiClient.setFingerprint(fingerprint.c_str());
+
+    cert = std::unique_ptr<BearSSL::X509List>(new BearSSL::X509List(pem.c_str()));
+    wifiClient.setTrustAnchors(cert.get());
 }
 

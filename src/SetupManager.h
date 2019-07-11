@@ -28,17 +28,21 @@ public:
 
     String getAuthorization() const { return authorization; }
     String getHostname() const { return hostname; }
+    String getCertificate() const { return cert; }
 private:
     bool checkFSForSettings();
     void postWifi();
     void postSettings();
+    void errorPage();
     bool hasSettings;
 
     const char *authFilename = "/authorization";
     const char *hostnameFilename = "/hostname";
+    const char *certFilename = "/certificate";
 
     String authorization;
     String hostname;
+    String cert;
     
     fs::FS &fileSystem;
     ESP8266WiFiClass &wifi;

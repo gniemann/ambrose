@@ -11,12 +11,12 @@
 #include <ESP8266mDNS.h>
 #include "SetupManager.h"
 
-const char *cert_fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
-
 const size_t capacity = 2 * JSON_OBJECT_SIZE(1) + 1000;
 
 bool SetupManager::checkFSForSettings() {
-    if (fileSystem.exists(authFilename) && fileSystem.exists(hostnameFilename)) {
+    if (fileSystem.exists(authFilename) &&
+        fileSystem.exists(hostnameFilename) &&
+        fileSystem.exists(certFilename)) {
         auto authFile = fileSystem.open(authFilename, "r");
         if (!authFile) {
             return false;
@@ -31,6 +31,14 @@ bool SetupManager::checkFSForSettings() {
 
         hostname = hostFile.readString();
         hostFile.close();
+
+        auto certFile = fileSystem.open(certFilename, "r");
+        if (!certFile) {
+            return false;
+        }
+
+        cert = certFile.readString();
+        certFile.close();
 
         return true;
     }
@@ -90,6 +98,7 @@ void SetupManager::postWifi() {
 
 void SetupManager::postSettings() {
     hostname = server.arg("hostname");
+    cert = server.arg("certificate");
     auto username = server.arg("username");
     auto password = server.arg("password");
     auto deviceName = server.arg("devicename");
@@ -99,10 +108,15 @@ void SetupManager::postSettings() {
 
     // get the device token
     HTTPClient client;
+    BearSSL::WiFiClientSecure wiFiClientSecure;
+
+    // this wasn't working with the x509 when on both station and AP, so initially set it to insecure.
+    wiFiClientSecure.setInsecure();
+
     auto registration_url = hostname + "/api/devices/register";
-    if (!client.begin(registration_url, cert_fingerprint)) {
-        log.notice("Could not begin session");
-        // TODO: Return failure page
+    if (!client.begin(wiFiClientSecure, registration_url)) {
+        errorPage();
+        return;
     }
 
     client.addHeader("Authorization", authHeader);
@@ -126,7 +140,8 @@ void SetupManager::postSettings() {
     auto status = client.POST(payload);
     if (status < 200 || status >= 400) {
         log.notice("Received non-200 status for device registration");
-        // TODO: Return failure page
+        errorPage();
+        return;
     }
 
     DynamicJsonBuffer jsonBuffer(capacity);
@@ -142,17 +157,25 @@ void SetupManager::postSettings() {
     hostFile.write((const uint8_t*)hostname.c_str(), hostname.length());
     hostFile.close();
 
+    auto certFile = fileSystem.open(certFilename, "w");
+    certFile.write((const uint8_t*)cert.c_str(), cert.length());
+    certFile.close();
+
     hasSettings = true;
 
     File file = SPIFFS.open("/success.html", "r");
     server.streamFile(file, "text/html");
     file.close();
 
-
-
     wifi.softAPdisconnect(true);
     MDNS.close();
     server.close();
+}
+
+void SetupManager::errorPage() {
+    File errorFile = SPIFFS.open("/error.html", "r");
+    server.streamFile(errorFile, "text/html");
+    errorFile.close();
 }
 
 void SetupManager::run() {

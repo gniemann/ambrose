@@ -22,8 +22,6 @@
 #include "ResetButton.h"
 #include "SystemStatusIndicator.h"
 
-const char *fingerprint = "08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
-
 using PIN = uint8_t;
 using Hz = int;
 
@@ -101,8 +99,25 @@ void updateClient() {
     }
 }
 
+void setClock() {
+    configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+    Serial.print("Waiting for NTP time sync: ");
+    time_t now = time(nullptr);
+    while (now < 8 * 3600 * 2) {
+        delay(500);
+        Serial.print(".");
+        now = time(nullptr);
+    }
+    Serial.println("");
+    struct tm timeinfo;
+    gmtime_r(&now, &timeinfo);
+    Serial.print("Current time: ");
+    Serial.print(asctime(&timeinfo));
+}
+
 void onWifiConnected() {
-    client = std::make_shared<StatusClient>(Log, setupManager.getHostname(), fingerprint, setupManager.getAuthorization());
+    setClock();
+    client = std::make_shared<StatusClient>(Log, setupManager.getHostname(), setupManager.getCertificate(), setupManager.getAuthorization());
     updateClient();
 
     Ticker tick(updateClient, MINUTE, 0, MILLIS);

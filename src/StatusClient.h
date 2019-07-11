@@ -20,7 +20,7 @@ class HTTPClient;
 
 class StatusClient {
 public:
-    StatusClient(Logging &log, const String &hostname, const String& fingerprint, const String &auth);
+    StatusClient(Logging &log, const String &hostname, const String& pem, const String &auth);
 
     int get();
     std::string error(int code) const;
@@ -31,6 +31,7 @@ private:
     String authorization;
     HTTPClient client;
     BearSSL::WiFiClientSecure wifiClient;
+    std::unique_ptr<BearSSL::X509List> cert;
 
     Logging &log;
 };
